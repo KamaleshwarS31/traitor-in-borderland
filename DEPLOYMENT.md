@@ -28,7 +28,7 @@ Ensure your project is pushed to a GitHub repository.
 1. Go to [Neon.tech](https://neon.tech) and sign up.
 2. Create a new project named `traitor-game`.
 3. Default database name `neondb` is fine.
-4. Once created, copy the **Connection String** (e.g., `postgres://user:pass@host/neondb...`).
+4. Once created, copy the **Connection String** (e.g., `postgres://user:pass@host/neondb...`).'postgresql://neondb_owner:npg_8XZJSNPd9eyF@ep-hidden-breeze-a1o2w70d-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
    - You will need this for the Backend deployment.
 5. Go to the **SQL Editor** in the Neon dashboard.
 6. Open your local file `backend/db/schema.sql`, copy all its contents, and paste them into the Neon SQL Editor.
@@ -60,7 +60,7 @@ Ensure your project is pushed to a GitHub repository.
      - *Alternatively*, you can paste the entire content of your Firebase JSON file into a variable named `FIREBASE_SERVICE_ACCOUNT_JSON`.
 
 6. Click **Create Web Service**.
-7. Wait for deployment to finish. Copy the **Service URL** (e.g., `https://traitor-backend.onrender.com`).
+7. Wait for deployment to finish. Copy the **Service URL** (e.g., `https://traitor-backend.onrender.com`).https://traitor-in-borderland.onrender.com
 
 ---
 

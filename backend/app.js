@@ -3,7 +3,11 @@ const cors = require("cors");
 const app = express();
 
 // Middleware
-app.use(cors());
+const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
+app.use(cors({
+    origin: [frontendUrl, "http://localhost:3000"],
+    credentials: true
+}));
 app.use(express.json());
 
 // Global Request Logger
