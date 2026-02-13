@@ -1,0 +1,22 @@
+node_modules/
+.env
+.DS_Store
+
+# Next.js
+.next/
+out/
+build/
+
+# Backend
+backend/traitor-in-borderland-firebase-adminsdk-fbsvc-23829d8c79.json
+backend/config/traitor-in-borderland-firebase-adminsdk-fbsvc-23829d8c79.json
+backend/.env
+
+# Artifacts
+artifact/
+.agent/
+
+# Environment files
+.env.local
+frontend/.env.local
+*.env
