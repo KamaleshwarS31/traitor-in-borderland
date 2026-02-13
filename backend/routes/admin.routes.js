@@ -561,7 +561,6 @@ router.post("/start-round", async (req, res) => {
         const io = req.app.get("io");
 
         // Get current game state
-        // Get current game state
         const gameStateResult = await db.query("SELECT * FROM game_state WHERE id = 1");
 
         let currentRound = 0;
@@ -572,16 +571,23 @@ router.post("/start-round", async (req, res) => {
             currentRound = gameStateResult.rows[0].current_round;
             totalRounds = gameStateResult.rows[0].total_rounds;
             roundDuration = gameStateResult.rows[0].round_duration;
-        } else {
-            // Initialize game state if missing
-            await db.query(`
-                INSERT INTO game_state (id, current_round, total_rounds, round_duration, sabotage_duration, sabotage_cooldown, sabotage_same_person_cooldown, game_status, updated_at)
-                VALUES (1, 0, 3, 600, 60, 300, 600, 'not_started', CURRENT_TIMESTAMP)
-            `);
+
+            // Check if current round is actually finished
+            if (gameStateResult.rows[0].game_status === 'in_progress' && gameStateResult.rows[0].round_end_time) {
+                if (new Date() < new Date(gameStateResult.rows[0].round_end_time)) {
+                    return res.status(400).json({ message: "Current round is still in progress" });
+                }
+            }
         }
 
         if (currentRound >= totalRounds) {
             return res.status(400).json({ message: "All rounds completed" });
+        }
+
+        // Check if there are any unscanned gold bars left
+        const goldBarsRes = await db.query("SELECT id, clue_text, clue_location_id FROM gold_bars WHERE is_scanned = FALSE");
+        if (goldBarsRes.rows.length === 0) {
+            return res.status(400).json({ message: "No unscanned gold bars remaining! Add more gold bars or reset the game." });
         }
 
         const newRound = currentRound + 1;
@@ -601,12 +607,12 @@ router.post("/start-round", async (req, res) => {
 
         // Assign initial clues to all teams
         const teams = await db.query("SELECT id FROM teams");
-        const goldBars = await db.query("SELECT id, clue_text, clue_location_id FROM gold_bars WHERE is_scanned = FALSE");
+        const availableBars = goldBarsRes.rows;
 
         for (const team of teams.rows) {
             // Randomly assign a gold bar clue to each team
-            const randomIndex = Math.floor(Math.random() * goldBars.rows.length);
-            const goldBar = goldBars.rows[randomIndex];
+            const randomIndex = Math.floor(Math.random() * availableBars.length);
+            const goldBar = availableBars[randomIndex];
 
             await db.query(`
                 INSERT INTO team_clues (team_id, current_clue_text, current_clue_location_id, next_gold_bar_id, updated_at)

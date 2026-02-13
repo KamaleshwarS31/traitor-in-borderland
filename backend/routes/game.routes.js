@@ -101,6 +101,17 @@ router.post("/sabotage", verifyToken, async (req, res) => {
             return res.status(400).json({ message: "Game round is not in progress" });
         }
 
+        // Check if round time has expired using DB time
+        const timeCheck = await db.query(`
+            SELECT id FROM game_state 
+            WHERE id = 1 AND round_end_time < NOW()
+        `);
+
+        if (timeCheck.rows.length > 0) {
+            await db.query("UPDATE game_state SET game_status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = 1");
+            return res.status(400).json({ message: "Round has ended! No more sabotages allowed." });
+        }
+
         const sabotageDuration = gameSettings.rows[0].sabotage_duration;
         const sabotageCooldown = gameSettings.rows[0].sabotage_cooldown;
         const sabotageSamePersonCooldown = gameSettings.rows[0].sabotage_same_person_cooldown;

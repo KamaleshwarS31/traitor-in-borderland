@@ -279,6 +279,17 @@ router.post("/scan-gold-bar", async (req, res) => {
         if (gameState.game_status !== 'in_progress') {
             return res.status(400).json({ message: "Game round is not in progress. Wait for admin to start." });
         }
+
+        // Check if round time has expired using DB time
+        const timeCheck = await db.query(`
+            SELECT id FROM game_state 
+            WHERE id = 1 AND round_end_time < NOW()
+        `);
+
+        if (timeCheck.rows.length > 0) {
+            await db.query("UPDATE game_state SET game_status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = 1");
+            return res.status(400).json({ message: "Round has ended! No more points can be collected." });
+        }
         const teamResult = await db.query(
             "SELECT team_id FROM team_members WHERE user_id = $1",
             [userId]
