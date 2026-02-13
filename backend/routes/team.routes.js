@@ -302,25 +302,58 @@ router.post("/scan-gold-bar", async (req, res) => {
 
         const goldBar = goldBarResult.rows[0];
 
-        // Check if already scanned
+        // Check current target for this team
+        const clueCheck = await db.query("SELECT next_gold_bar_id FROM team_clues WHERE team_id = $1", [teamId]);
+        const currentTargetId = clueCheck.rows.length > 0 ? clueCheck.rows[0].next_gold_bar_id : null;
+
+        // If already scanned, inform them AND give a new random clue
         if (goldBar.is_scanned) {
+            // Get next available gold bar for clue (randomly)
+            const nextGoldBarResult = await db.query(`
+                SELECT id, clue_text, clue_location_id 
+                FROM gold_bars 
+                WHERE is_scanned = FALSE 
+                ORDER BY RANDOM()
+                LIMIT 1
+            `);
+
+            let nextClue = null;
+            if (nextGoldBarResult.rows.length > 0) {
+                const nextGoldBar = nextGoldBarResult.rows[0];
+                await db.query(`
+                    INSERT INTO team_clues (team_id, current_clue_text, current_clue_location_id, next_gold_bar_id, updated_at)
+                    VALUES ($4, $1, $2, $3, CURRENT_TIMESTAMP)
+                    ON CONFLICT (team_id) 
+                    DO UPDATE SET 
+                        current_clue_text = $1,
+                        current_clue_location_id = $2,
+                        next_gold_bar_id = $3,
+                        updated_at = CURRENT_TIMESTAMP
+                `, [nextGoldBar.clue_text, nextGoldBar.clue_location_id, nextGoldBar.id, teamId]);
+                nextClue = nextGoldBar.clue_text;
+            }
+
+            // Emit update to the team so their UI refreshes with the new clue
+            io.to(`team_${teamId}`).emit("score_update", {
+                points: 0,
+                total_score: null,
+                next_clue: nextClue
+            });
+
             return res.json({
                 success: false,
-                message: "This gold bar has already been collected",
+                message: "This gold bar was already collected! We've assigned you a new random clue.",
+                next_clue: nextClue,
                 points: 0
             });
         }
 
-        // Verify constraint: Clue must match the scanned gold bar
-        const clueCheck = await db.query("SELECT next_gold_bar_id FROM team_clues WHERE team_id = $1", [teamId]);
-
-        if (clueCheck.rows.length > 0 && clueCheck.rows[0].next_gold_bar_id) {
-            if (clueCheck.rows[0].next_gold_bar_id !== goldBar.id) {
-                return res.json({
-                    success: false,
-                    message: "This is not the correct gold bar key! Check your clue."
-                });
-            }
+        // Verify constraint: only can scan the bar assigned to them (if not already scanned)
+        if (currentTargetId && currentTargetId !== goldBar.id) {
+            return res.json({
+                success: false,
+                message: "This is not the correct gold bar key! Check your clue."
+            });
         }
 
         // Check if team is currently sabotaged
@@ -349,7 +382,7 @@ router.post("/scan-gold-bar", async (req, res) => {
             WHERE id = $2
         `, [teamId, goldBar.id]);
 
-        // Update team score (0 if sabotaged)
+        // Update team score
         const pointsToAdd = isSabotaged ? 0 : goldBar.points;
         const scoreUpdateResult = await db.query(`
             UPDATE teams 
@@ -365,16 +398,13 @@ router.post("/scan-gold-bar", async (req, res) => {
             SELECT id, clue_text, clue_location_id 
             FROM gold_bars 
             WHERE is_scanned = FALSE 
-            AND id != $1
             ORDER BY RANDOM()
             LIMIT 1
-        `, [goldBar.id]);
+        `);
 
         let nextClue = null;
         if (nextGoldBarResult.rows.length > 0) {
             const nextGoldBar = nextGoldBarResult.rows[0];
-
-            // Update team's current clue
             await db.query(`
                 INSERT INTO team_clues (team_id, current_clue_text, current_clue_location_id, next_gold_bar_id, updated_at)
                 VALUES ($4, $1, $2, $3, CURRENT_TIMESTAMP)
@@ -385,7 +415,6 @@ router.post("/scan-gold-bar", async (req, res) => {
                     next_gold_bar_id = $3,
                     updated_at = CURRENT_TIMESTAMP
             `, [nextGoldBar.clue_text, nextGoldBar.clue_location_id, nextGoldBar.id, teamId]);
-
             nextClue = nextGoldBar.clue_text;
         }
 
