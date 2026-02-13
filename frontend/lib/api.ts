@@ -117,6 +117,7 @@ export const teamAPI = {
 export const gameAPI = {
     getGameState: () => api.get("/api/game/state"),
     getLeaderboard: () => api.get("/api/game/leaderboard"),
+    getLiveLeaderboard: () => api.get("/api/game/leaderboard/live"),
     sabotage: (data: { target_team_id: number }) =>
         api.post("/api/game/sabotage", data),
     getInnocentTeams: () => api.get("/api/game/innocent-teams"),

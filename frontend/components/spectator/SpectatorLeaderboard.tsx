@@ -33,7 +33,7 @@ export default function SpectatorLeaderboard() {
 
     const fetchLeaderboard = async () => {
         try {
-            const response = await gameAPI.getLeaderboard();
+            const response = await gameAPI.getLiveLeaderboard();
             setTeams(response.data);
         } catch (error) {
             console.error("Error fetching leaderboard:", error);
@@ -50,15 +50,13 @@ export default function SpectatorLeaderboard() {
             setTeams(updatedTeams);
         });
 
-        // Also listen for score updates directly if needed, but leaderboard_update covers it usually
-        // Also listen for score updates directly if needed, but leaderboard_update covers it usually
         socket.on("score_update", () => {
             fetchLeaderboard();
         });
 
-        socket.on("leaderboard_visibility", (data: { visible: boolean }) => {
-            if (data.visible) fetchLeaderboard();
-            else setTeams([]);
+        // Spectators ignore the visibility toggle (it's always live for them)
+        socket.on("leaderboard_visibility", () => {
+            fetchLeaderboard();
         });
 
         return () => {

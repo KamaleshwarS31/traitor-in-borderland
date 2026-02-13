@@ -21,17 +21,9 @@ router.get("/state", async (req, res) => {
     }
 });
 
-// Get leaderboard (Public)
+// Get leaderboard (Public, follows published toggle)
 router.get("/leaderboard", async (req, res) => {
     try {
-        // Check if leaderboard is published
-        const gameState = await db.query("SELECT is_leaderboard_published FROM game_state WHERE id = 1");
-        // If column doesn't exist yet, it might error. But 'SELECT is_leaderboard_published' will error if column missing.
-        // I should probably handle that gracefully or assume column exists (since admin endpoint adds it).
-        // If error, likely column missing -> treat as published or not? 
-        // Safer to wrap in try/catch or select *.
-        // Let's select * to be safe.
-
         const gs = await db.query("SELECT * FROM game_state WHERE id = 1");
         if (gs.rows.length > 0 && gs.rows[0].is_leaderboard_published === false) {
             return res.json([]);
@@ -49,6 +41,24 @@ router.get("/leaderboard", async (req, res) => {
     } catch (error) {
         console.error("Get leaderboard error:", error);
         res.status(500).json({ message: "Error fetching leaderboard" });
+    }
+});
+
+// Get Live Leaderboard (Always public, for spectators)
+router.get("/leaderboard/live", async (req, res) => {
+    try {
+        const result = await db.query(`
+            SELECT t.id, t.team_name, t.team_type, t.total_score,
+                   COUNT(DISTINCT tm.user_id) as member_count
+            FROM teams t
+            LEFT JOIN team_members tm ON t.id = tm.team_id
+            GROUP BY t.id, t.team_name, t.team_type, t.total_score
+            ORDER BY t.total_score DESC, t.team_name ASC
+        `);
+        res.json(result.rows);
+    } catch (error) {
+        console.error("Get live leaderboard error:", error);
+        res.status(500).json({ message: "Error fetching live leaderboard" });
     }
 });
 
