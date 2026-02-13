@@ -528,7 +528,27 @@ router.put("/game-settings", async (req, res) => {
 router.get("/game-settings", async (req, res) => {
     try {
         const result = await db.query("SELECT * FROM game_state WHERE id = 1");
-        res.json(result.rows[0]);
+        const gameState = result.rows[0];
+
+        if (gameState && gameState.game_status === 'in_progress' && gameState.round_end_time) {
+            const now = new Date();
+            const endTime = new Date(gameState.round_end_time);
+
+            if (now > endTime) {
+                // Auto-complete round
+                await db.query("UPDATE game_state SET game_status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = 1");
+                gameState.game_status = 'completed';
+
+                // Emit round end event
+                const io = req.app.get("io");
+                io.emit("round_ended", {
+                    round: gameState.current_round,
+                    status: 'completed'
+                });
+            }
+        }
+
+        res.json(gameState);
     } catch (error) {
         console.error("Get game settings error:", error);
         res.status(500).json({ message: "Error fetching game settings" });

@@ -102,6 +102,15 @@ export default function MemberDashboard() {
             setSabotageAlert({ open: false, endTime: null });
         });
 
+        socket.on("round_ended", (data) => {
+            setGameState((prev: any) => ({
+                ...prev,
+                game_status: "completed"
+            }));
+            setSuccess(`Round ${data.round} has ended!`);
+            fetchData();
+        });
+
         socket.on("game_reset", () => {
             setGameState((prev: any) => ({
                 ...prev,

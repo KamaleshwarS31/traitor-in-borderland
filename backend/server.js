@@ -40,6 +40,35 @@ io.on("connection", (socket) => {
 // Make io accessible to routes
 app.set("io", io);
 
-server.listen(PORT, () => {
+// Database Migration & Initialization
+const db = require("./db");
+const runMigrations = async () => {
+    try {
+        console.log("Running database migrations...");
+        // Add is_leaderboard_published if it doesn't exist
+        await db.query(`
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                               WHERE table_name='game_state' AND column_name='is_leaderboard_published') THEN
+                    ALTER TABLE game_state ADD COLUMN is_leaderboard_published BOOLEAN DEFAULT FALSE;
+                END IF;
+            END $$;
+        `);
+
+        // Ensure game_state row exists
+        await db.query(`
+            INSERT INTO game_state (id, total_rounds, round_duration, sabotage_duration, sabotage_cooldown, sabotage_same_person_cooldown, game_status)
+            VALUES (1, 4, 600, 60, 120, 300, 'not_started')
+            ON CONFLICT (id) DO NOTHING;
+        `);
+        console.log("Migrations completed.");
+    } catch (err) {
+        console.error("Migration error:", err);
+    }
+};
+
+server.listen(PORT, async () => {
+    await runMigrations();
     console.log(`Server running on port ${PORT}`);
 });

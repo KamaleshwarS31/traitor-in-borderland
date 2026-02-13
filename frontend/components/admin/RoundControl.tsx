@@ -53,6 +53,10 @@ export default function RoundControl() {
             fetchGameState();
         });
 
+        socket.on("round_ended", () => {
+            fetchGameState();
+        });
+
         socket.on("game_reset", () => {
             fetchGameState();
         });
