@@ -136,7 +136,7 @@ export default function AnalyticsDashboard() {
         <Box>
             {/* Key Metrics */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <StatCard
                         title="Total Teams"
                         value={analytics.teams.total}
@@ -144,7 +144,7 @@ export default function AnalyticsDashboard() {
                         color="#3B82F6"
                     />
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <StatCard
                         title="Gold Bars Remaining"
                         value={`${analytics.gold_bars.remaining}/${analytics.gold_bars.total}`}
@@ -152,7 +152,7 @@ export default function AnalyticsDashboard() {
                         color="#F59E0B"
                     />
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <StatCard
                         title="Active Sabotages"
                         value={analytics.sabotages.active_sabotages}
@@ -160,7 +160,7 @@ export default function AnalyticsDashboard() {
                         color="#EF4444"
                     />
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                     <StatCard
                         title="Points Collected"
                         value={analytics.gold_bars.points_collected || 0}
@@ -172,7 +172,7 @@ export default function AnalyticsDashboard() {
 
             <Grid container spacing={3}>
                 {/* Top Teams */}
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                     <Card
                         sx={{
                             background: "linear-gradient(135deg, #1E293B 0%, #334155 100%)",
@@ -249,7 +249,7 @@ export default function AnalyticsDashboard() {
                 </Grid>
 
                 {/* Recent Activity */}
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                     <Card
                         sx={{
                             background: "linear-gradient(135deg, #1E293B 0%, #334155 100%)",
@@ -305,7 +305,7 @@ export default function AnalyticsDashboard() {
                 </Grid>
 
                 {/* Team Performance */}
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                     <Card
                         sx={{
                             background: "linear-gradient(135deg, #1E293B 0%, #334155 100%)",

@@ -164,7 +164,7 @@ export default function Home() {
 
         {/* Teams Section */}
         <Grid container spacing={4} sx={{ mb: 8 }}>
-          <Grid item xs={12} md={6} className="slide-in-left">
+          <Grid size={{ xs: 12, md: 6 }} className="slide-in-left">
             <Card
               sx={{
                 height: "100%",
@@ -206,7 +206,7 @@ export default function Home() {
             </Card>
           </Grid>
 
-          <Grid item xs={12} md={6} className="slide-in-right">
+          <Grid size={{ xs: 12, md: 6 }} className="slide-in-right">
             <Card
               sx={{
                 height: "100%",
@@ -280,7 +280,7 @@ export default function Home() {
               description: "Work with 3 teammates to dominate the competition",
             },
           ].map((feature, index) => (
-            <Grid item xs={12} sm={6} md={3} key={index} className="fade-in">
+            <Grid size={{ xs: 12, sm: 6, md: 3 }} key={index} className="fade-in">
               <Card
                 sx={{
                   height: "100%",
@@ -319,7 +319,7 @@ export default function Home() {
           className="fade-in"
         >
           <Grid container spacing={4}>
-            <Grid item xs={6} md={3}>
+            <Grid size={{ xs: 6, md: 3 }}>
               <Typography variant="h2" sx={{ fontWeight: 900, color: "primary.main" }}>
                 20
               </Typography>
@@ -327,7 +327,7 @@ export default function Home() {
                 Teams
               </Typography>
             </Grid>
-            <Grid item xs={6} md={3}>
+            <Grid size={{ xs: 6, md: 3 }}>
               <Typography variant="h2" sx={{ fontWeight: 900, color: "secondary.main" }}>
                 80
               </Typography>
@@ -335,7 +335,7 @@ export default function Home() {
                 Players
               </Typography>
             </Grid>
-            <Grid item xs={6} md={3}>
+            <Grid size={{ xs: 6, md: 3 }}>
               <Typography variant="h2" sx={{ fontWeight: 900, color: "success.main" }}>
                 4
               </Typography>
@@ -343,7 +343,7 @@ export default function Home() {
                 Rounds
               </Typography>
             </Grid>
-            <Grid item xs={6} md={3}>
+            <Grid size={{ xs: 6, md: 3 }}>
               <Typography variant="h2" sx={{ fontWeight: 900, color: "warning.main" }}>
                 ∞
               </Typography>

@@ -152,7 +152,7 @@ export default function GoldBarsManager() {
     return (
         <>
             <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                     <Card
                         sx={{
                             background: "linear-gradient(135deg, #1E293B 0%, #334155 100%)",
@@ -239,7 +239,7 @@ export default function GoldBarsManager() {
                     </Card>
                 </Grid>
 
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                     <Card
                         sx={{
                             background: "linear-gradient(135deg, #1E293B 0%, #334155 100%)",

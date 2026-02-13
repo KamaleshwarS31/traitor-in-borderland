@@ -77,7 +77,7 @@ export default function AssignmentCardsGenerator() {
                     </Alert>
 
                     <Grid container spacing={2} sx={{ mb: 3 }}>
-                        <Grid item xs={12} md={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <TextField
                                 fullWidth
                                 label="Number of Innocent Cards"
@@ -87,7 +87,7 @@ export default function AssignmentCardsGenerator() {
                                 inputProps={{ min: 1, max: 20 }}
                             />
                         </Grid>
-                        <Grid item xs={12} md={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <TextField
                                 fullWidth
                                 label="Number of Traitor Cards"
@@ -140,7 +140,7 @@ export default function AssignmentCardsGenerator() {
                 <DialogContent>
                     <Grid container spacing={2}>
                         {/* Innocents */}
-                        <Grid item xs={12} md={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <Typography variant="h6" sx={{ mb: 2, color: "primary.main" }}>
                                 Innocent Cards ({cards.filter((c) => c.team_type === "innocent").length})
                             </Typography>
@@ -172,7 +172,7 @@ export default function AssignmentCardsGenerator() {
                         </Grid>
 
                         {/* Traitors */}
-                        <Grid item xs={12} md={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <Typography variant="h6" sx={{ mb: 2, color: "secondary.main" }}>
                                 Traitor Cards ({cards.filter((c) => c.team_type === "traitor").length})
                             </Typography>

@@ -108,7 +108,7 @@ export default function GameSettings() {
 
                 <Box component="form" onSubmit={handleSubmit}>
                     <Grid container spacing={3}>
-                        <Grid item xs={12} md={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 700 }}>
                                 Round Settings
                             </Typography>
@@ -138,7 +138,7 @@ export default function GameSettings() {
                             />
                         </Grid>
 
-                        <Grid item xs={12} md={6}>
+                        <Grid size={{ xs: 12, md: 6 }}>
                             <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 700 }}>
                                 Sabotage Settings
                             </Typography>

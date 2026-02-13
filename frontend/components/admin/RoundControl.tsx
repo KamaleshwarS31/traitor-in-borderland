@@ -126,7 +126,7 @@ export default function RoundControl() {
         <>
             <Grid container spacing={3}>
                 {/* Game Status Card */}
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                     <Card
                         sx={{
                             background: "linear-gradient(135deg, #1E293B 0%, #334155 100%)",
@@ -192,7 +192,7 @@ export default function RoundControl() {
                 </Grid>
 
                 {/* Controls Card */}
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                     <Card
                         sx={{
                             background: "linear-gradient(135deg, #1E293B 0%, #334155 100%)",
@@ -262,7 +262,7 @@ export default function RoundControl() {
                 </Grid>
 
                 {/* Round Info */}
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                     <Card
                         sx={{
                             background: "linear-gradient(135deg, #1E293B 0%, #334155 100%)",
@@ -274,7 +274,7 @@ export default function RoundControl() {
                                 Round Configuration
                             </Typography>
                             <Grid container spacing={2}>
-                                <Grid item xs={6} md={3}>
+                                <Grid size={{ xs: 6, md: 3 }}>
                                     <Typography variant="body2" color="text.secondary">
                                         Total Rounds
                                     </Typography>
@@ -282,7 +282,7 @@ export default function RoundControl() {
                                         {gameState.total_rounds}
                                     </Typography>
                                 </Grid>
-                                <Grid item xs={6} md={3}>
+                                <Grid size={{ xs: 6, md: 3 }}>
                                     <Typography variant="body2" color="text.secondary">
                                         Round Duration
                                     </Typography>
@@ -290,7 +290,7 @@ export default function RoundControl() {
                                         {gameState.round_duration / 60} minutes
                                     </Typography>
                                 </Grid>
-                                <Grid item xs={6} md={3}>
+                                <Grid size={{ xs: 6, md: 3 }}>
                                     <Typography variant="body2" color="text.secondary">
                                         Completed Rounds
                                     </Typography>
@@ -298,7 +298,7 @@ export default function RoundControl() {
                                         {gameState.current_round}
                                     </Typography>
                                 </Grid>
-                                <Grid item xs={6} md={3}>
+                                <Grid size={{ xs: 6, md: 3 }}>
                                     <Typography variant="body2" color="text.secondary">
                                         Remaining Rounds
                                     </Typography>
