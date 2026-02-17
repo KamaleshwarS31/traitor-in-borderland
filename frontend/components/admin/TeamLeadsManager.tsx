@@ -77,14 +77,14 @@ export default function TeamLeadsManager() {
                 <Box component="form" onSubmit={handleSubmit} sx={{ mb: 4 }}>
                     <TextField
                         fullWidth
-                        label="VIT Email"
+                        label="Email Address"
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
                         sx={{ mb: 2 }}
-                        placeholder="teamlead@vit.ac.in"
-                        helperText="Must be a valid VIT email address"
+                        placeholder="teamlead@example.com"
+                        helperText="Provide a valid email address for the Team Lead"
                     />
                     <Button
                         type="submit"

@@ -1,7 +1,7 @@
 const admin = require("../config/firebase");
 const db = require("../db");
 
-// Verify Firebase token and check VIT email
+// Verify Firebase token and authenticate user
 const verifyToken = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
@@ -12,11 +12,6 @@ const verifyToken = async (req, res, next) => {
         const token = authHeader.split(" ")[1];
         const decoded = await admin.auth().verifyIdToken(token);
         const email = decoded.email;
-
-        // Check VIT email domain
-        if (!email.endsWith("@vit.ac.in") && !email.endsWith("@vitstudent.ac.in")) {
-            return res.status(403).json({ message: "Invalid VIT email domain" });
-        }
 
         // Get user from database
         const userResult = await db.query(

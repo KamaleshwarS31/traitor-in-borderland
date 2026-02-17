@@ -56,12 +56,10 @@ export default function LoginPage() {
             await signInWithGoogle();
         } catch (err: any) {
             console.error("Google Login error:", err);
-            if (err.message && err.message.includes("Invalid VIT email")) {
-                setError("Only @vit.ac.in or @vitstudent.ac.in emails are allowed");
-            } else if (err.code === "auth/popup-closed-by-user") {
+            if (err.code === "auth/popup-closed-by-user") {
                 setError("Sign in cancelled");
             } else {
-                setError("Failed to sign in with Google. ensure your account is allowed.");
+                setError("Failed to sign in with Google or account not authorized.");
             }
         } finally {
             setSubmitting(false);
@@ -190,7 +188,7 @@ export default function LoginPage() {
                                 }
                             }}
                         >
-                            Sign in with VIT Email (Google)
+                            Sign in with Google
                         </Button>
 
                         <Divider sx={{ mb: 3, "&::before, &::after": { borderColor: "rgba(255,255,255,0.1)" } }}>
@@ -202,14 +200,14 @@ export default function LoginPage() {
                         <form onSubmit={handleSubmit}>
                             <TextField
                                 fullWidth
-                                label="VIT Email"
+                                label="Email Address"
                                 type="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
                                 sx={{ mb: 3 }}
-                                placeholder="yourname@vit.ac.in"
-                                helperText="Use your VIT email address"
+                                placeholder="your.email@example.com"
+                                helperText="Use your registered email address"
                             />
 
                             <TextField
@@ -273,7 +271,7 @@ export default function LoginPage() {
                     variant="body2"
                     sx={{ textAlign: "center", mt: 3, color: "text.secondary" }}
                 >
-                    Only VIT email addresses (@vit.ac.in or @vitstudent.ac.in) are allowed
+                    Participants must be registered to enter the borderland
                 </Typography>
             </Container>
         </Box>

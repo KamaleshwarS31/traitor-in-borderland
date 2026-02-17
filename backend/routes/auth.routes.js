@@ -30,11 +30,6 @@ router.post("/register-member", async (req, res) => {
         const decoded = await admin.auth().verifyIdToken(token);
         const email = decoded.email;
 
-        // Check VIT email domain
-        if (!email.endsWith("@vit.ac.in") && !email.endsWith("@vitstudent.ac.in")) {
-            return res.status(403).json({ message: "Invalid VIT email domain" });
-        }
-
         // Check if user already exists
         const existingUser = await db.query(
             "SELECT * FROM users WHERE email = $1",

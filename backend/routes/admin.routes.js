@@ -347,11 +347,6 @@ router.post("/team-leads", async (req, res) => {
     try {
         const { email } = req.body;
 
-        // Validate VIT email
-        if (!email.endsWith("@vit.ac.in") && !email.endsWith("@vitstudent.ac.in")) {
-            return res.status(400).json({ message: "Invalid VIT email domain" });
-        }
-
         const result = await db.query(
             "INSERT INTO users (email, role) VALUES ($1, 'team_lead') RETURNING *",
             [email]
