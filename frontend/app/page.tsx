@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Box,
@@ -50,7 +49,7 @@ export default function Home() {
     return (
       <Box
         sx={{
-          minHeight: "100vh",
+          minHeight: "calc(100vh - 140px)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -65,63 +64,11 @@ export default function Home() {
   return (
     <Box
       sx={{
-        minHeight: "100vh",
         background: "linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%)",
         position: "relative",
         overflow: "hidden",
       }}
     >
-      {/* ── Header Bar ── */}
-      <Box
-        component="header"
-        sx={{
-          width: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          px: { xs: 2, md: 5 },
-          py: 1.5,
-          background: "rgba(15, 23, 42, 0.85)",
-          backdropFilter: "blur(12px)",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
-          position: "sticky",
-          top: 0,
-          zIndex: 1200,
-        }}
-      >
-        {/* Left – VIT Logo */}
-        <Box sx={{ display: "flex", alignItems: "center" }}>
-          <Image
-            src="/vit-logo.png"
-            alt="VIT University"
-            width={110}
-            height={60}
-            style={{ objectFit: "contain" }}
-          />
-        </Box>
-
-        {/* Centre – Riviera 2026 Logo */}
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", flex: 1 }}>
-          <Image
-            src="/riviera-logo.png"
-            alt="Riviera 2026"
-            width={200}
-            height={70}
-            style={{ objectFit: "contain" }}
-          />
-        </Box>
-
-        {/* Right – Pepsi Logo */}
-        <Box sx={{ display: "flex", alignItems: "center" }}>
-          <Image
-            src="/pepsi-logo.png"
-            alt="Pepsi – Official Sponsor"
-            width={90}
-            height={60}
-            style={{ objectFit: "contain" }}
-          />
-        </Box>
-      </Box>
       {/* Animated Background Elements */}
       <Box
         sx={{
@@ -406,64 +353,6 @@ export default function Home() {
           </Grid>
         </Box>
       </Container>
-
-      {/* ── Footer Banner ── */}
-      <Box
-        sx={{
-          width: "100%",
-          mt: 8,
-          display: "flex",
-          justifyContent: "center",
-          background: "rgba(15, 23, 42, 0.6)",
-          borderTop: "1px solid rgba(255,255,255,0.08)",
-          py: 2,
-          px: 2,
-        }}
-      >
-        <Image
-          src="/footer-banner.png"
-          alt="Footer banner"
-          width={1200}
-          height={140}
-          style={{ objectFit: "contain", maxWidth: "100%", height: "auto" }}
-        />
-      </Box>
-
-      {/* ── Copyright Bar ── */}
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 2,
-          py: 2,
-          borderTop: "1px solid rgba(255,255,255,0.06)",
-          flexWrap: "wrap",
-          px: 2,
-        }}
-      >
-        {/* Health Club Logo – left of copyright */}
-        <Image
-          src="/healthclub-logo.png"
-          alt="Health Club VIT"
-          width={80}
-          height={40}
-          style={{ objectFit: "contain" }}
-        />
-
-        <Typography variant="body2" sx={{ color: "text.secondary", textAlign: "center" }}>
-          © 2026 Health Club - VIT. All rights reserved.
-        </Typography>
-
-        {/* 40 Years VIT Logo – right of copyright */}
-        <Image
-          src="/vit-40years.png"
-          alt="VIT 40 Years"
-          width={80}
-          height={40}
-          style={{ objectFit: "contain" }}
-        />
-      </Box>
     </Box>
   );
 }
