@@ -1016,5 +1016,156 @@ router.post("/teams/:id/extra-points", async (req, res) => {
         res.status(500).json({ message: "Error adding extra points" });
     }
 });
+// ─── POLL MANAGEMENT ───────────────────────────────────────────────
+const POLL_DURATION_SECONDS = 105; // 1 min 45 sec
+
+// Start a traitor-finding poll
+router.post("/start-poll", async (req, res) => {
+    try {
+        const io = req.app.get("io");
+
+        // Check no active poll already running
+        const existingPoll = await db.query(
+            "SELECT id FROM polls WHERE status = 'active' AND ends_at > NOW()"
+        );
+        if (existingPoll.rows.length > 0) {
+            return res.status(400).json({ message: "A poll is already active" });
+        }
+
+        // Get current round number
+        const gs = await db.query("SELECT current_round FROM game_state WHERE id = 1");
+        const round = gs.rows[0]?.current_round || 0;
+
+        // Create the poll
+        const pollResult = await db.query(
+            `INSERT INTO polls (round_number, status, ends_at)
+             VALUES ($1, 'active', NOW() + ($2 || ' seconds')::interval)
+             RETURNING *`,
+            [round, POLL_DURATION_SECONDS]
+        );
+        const poll = pollResult.rows[0];
+
+        // Broadcast to all players
+        io.emit("poll_started", {
+            poll_id: poll.id,
+            round_number: poll.round_number,
+            ends_at: poll.ends_at,
+            duration_seconds: POLL_DURATION_SECONDS
+        });
+
+        // Auto-end poll after duration
+        setTimeout(async () => {
+            try {
+                await endPoll(poll.id, io);
+            } catch (e) {
+                console.error("Auto-end poll error:", e);
+            }
+        }, POLL_DURATION_SECONDS * 1000);
+
+        res.json({ poll_id: poll.id, ends_at: poll.ends_at, message: "Poll started" });
+    } catch (error) {
+        console.error("Start poll error:", error);
+        res.status(500).json({ message: "Error starting poll" });
+    }
+});
+
+// Helper: end a poll and broadcast results
+async function endPoll(pollId, io) {
+    // Mark poll as completed (idempotent)
+    const updated = await db.query(
+        "UPDATE polls SET status = 'completed' WHERE id = $1 AND status = 'active' RETURNING *",
+        [pollId]
+    );
+    if (!updated.rows.length) return; // already ended
+
+    // Tally votes per team
+    const voteCounts = await db.query(`
+        SELECT pv.voted_for_team_id, t.team_name, t.team_type,
+               COUNT(*) as vote_count
+        FROM poll_votes pv
+        JOIN teams t ON t.id = pv.voted_for_team_id
+        WHERE pv.poll_id = $1
+        GROUP BY pv.voted_for_team_id, t.team_name, t.team_type
+        ORDER BY vote_count DESC
+    `, [pollId]);
+
+    const results = voteCounts.rows;
+    let traitorFound = false;
+    let foundTeamId = null;
+    let foundTeamName = null;
+
+    if (results.length > 0) {
+        const topVoted = results[0];
+        if (topVoted.team_type === 'traitor') {
+            traitorFound = true;
+            foundTeamId = topVoted.voted_for_team_id;
+            foundTeamName = topVoted.team_name;
+        }
+    }
+
+    // Broadcast results to all
+    io.emit("poll_ended", {
+        poll_id: pollId,
+        traitor_found: traitorFound,
+        found_team_id: foundTeamId,
+        found_team_name: foundTeamName,
+        results: results.map(r => ({
+            team_id: r.voted_for_team_id,
+            team_name: r.team_name,
+            team_type: r.team_type,
+            vote_count: parseInt(r.vote_count)
+        }))
+    });
+
+    // Alert the found traitor team specifically
+    if (traitorFound && foundTeamId) {
+        io.to(`team_${foundTeamId}`).emit("traitor_exposed", {
+            message: "Your team has been identified as the traitor! Prepare for your physical task.",
+            poll_id: pollId
+        });
+    }
+}
+
+// Get current/latest poll (admin view with votes)
+router.get("/poll/current", async (req, res) => {
+    try {
+        const pollResult = await db.query(
+            "SELECT * FROM polls ORDER BY created_at DESC LIMIT 1"
+        );
+        if (!pollResult.rows.length) {
+            return res.json({ poll: null });
+        }
+        const poll = pollResult.rows[0];
+
+        // Get vote tallies
+        const votes = await db.query(`
+            SELECT pv.voted_for_team_id, t.team_name, t.team_type,
+                   COUNT(*) as vote_count
+            FROM poll_votes pv
+            JOIN teams t ON t.id = pv.voted_for_team_id
+            WHERE pv.poll_id = $1
+            GROUP BY pv.voted_for_team_id, t.team_name, t.team_type
+            ORDER BY vote_count DESC
+        `, [poll.id]);
+
+        res.json({ poll, results: votes.rows });
+    } catch (error) {
+        console.error("Get poll error:", error);
+        res.status(500).json({ message: "Error fetching poll" });
+    }
+});
+
+// Manually end a poll early
+router.post("/poll/:id/end", async (req, res) => {
+    try {
+        const io = req.app.get("io");
+        const { id } = req.params;
+        await endPoll(parseInt(id), io);
+        res.json({ message: "Poll ended" });
+    } catch (error) {
+        console.error("End poll error:", error);
+        res.status(500).json({ message: "Error ending poll" });
+    }
+});
 
 module.exports = router;

@@ -33,6 +33,7 @@ import {
     Analytics,
     Group,
     Person,
+    HowToVote,
 } from "@mui/icons-material";
 import LocationsManager from "@/components/admin/LocationsManager";
 import GoldBarsManager from "@/components/admin/GoldBarsManager";
@@ -46,6 +47,7 @@ import LiveLeaderboard from "@/components/admin/LiveLeaderboard";
 import TeamsByType from "@/components/admin/TeamsByType";
 import SabotageMonitor from "@/components/admin/SabotageMonitor";
 import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
+import PollControl from "@/components/admin/PollControl";
 
 export default function AdminDashboard() {
     const router = useRouter();
@@ -149,7 +151,16 @@ export default function AdminDashboard() {
                                 </Grid>
                             </Grid>
                         )}
-                        {currentTab === 2 && <RoundControl />}
+                        {currentTab === 2 && (
+                            <Grid container spacing={3}>
+                                <Grid size={{ xs: 12, lg: 7 }}>
+                                    <RoundControl />
+                                </Grid>
+                                <Grid size={{ xs: 12, lg: 5 }}>
+                                    <PollControl />
+                                </Grid>
+                            </Grid>
+                        )}
                         {currentTab === 3 && <SabotageMonitor />}
                         {currentTab === 4 && <LocationsManager />}
                         {currentTab === 5 && <GoldBarsManager />}

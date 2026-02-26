@@ -90,6 +90,30 @@ const runMigrations = async () => {
             console.log(`Backfilled entry_code for ${missingCodes.rows.length} gold bars.`);
         }
 
+        // Create polls table for traitor voting
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS polls (
+                id SERIAL PRIMARY KEY,
+                round_number INTEGER NOT NULL,
+                status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'completed')),
+                ends_at TIMESTAMPTZ NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            );
+        `);
+
+        // Create poll_votes table
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS poll_votes (
+                id SERIAL PRIMARY KEY,
+                poll_id INTEGER NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+                voter_team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+                voted_for_team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                UNIQUE(poll_id, voter_team_id)
+            );
+        `);
+        console.log("Poll tables ready.");
+
         // Pre-warm Firebase token verification key cache with a dummy call
         // This avoids a cold-start timeout on the first real user login
         const admin = require("./config/firebase");

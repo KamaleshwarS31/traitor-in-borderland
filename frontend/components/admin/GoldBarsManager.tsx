@@ -239,7 +239,7 @@ export default function GoldBarsManager() {
             ctx.fillStyle = "#9CA3AF";
             ctx.font = "14px Arial";
             ctx.textAlign = "center";
-            ctx.fillText("Health Club · VIT Chennai", CARD_W / 2, CARD_H - 22);
+            ctx.fillText("Health Club · VIT Vellore", CARD_W / 2, CARD_H - 22);
 
             // Download
             const link = document.createElement("a");
@@ -255,7 +255,7 @@ export default function GoldBarsManager() {
         logo.onerror = onLoad; // proceed even if logo fails
         qrImg.onload = onLoad;
 
-        logo.src = "/healthclub-logo.png";
+        logo.src = "/healthclub-logo-black.png";
         qrImg.src = selectedQR;
     };
 

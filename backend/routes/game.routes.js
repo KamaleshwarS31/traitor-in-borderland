@@ -386,4 +386,130 @@ router.get("/sabotage-cooldown", verifyToken, async (req, res) => {
     }
 });
 
+// ─── POLL (Traitor Voting) ──────────────────────────────────────────
+
+// Get current active poll (player view - no vote counts revealed while active)
+router.get("/poll/current", verifyToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Get team
+        const teamResult = await db.query(
+            "SELECT team_id FROM team_members WHERE user_id = $1",
+            [userId]
+        );
+        const myTeamId = teamResult.rows[0]?.team_id || null;
+
+        // Get latest poll
+        const pollResult = await db.query(
+            "SELECT * FROM polls ORDER BY created_at DESC LIMIT 1"
+        );
+        if (!pollResult.rows.length) {
+            return res.json({ poll: null });
+        }
+        const poll = pollResult.rows[0];
+        const isActive = poll.status === 'active' && new Date(poll.ends_at) > new Date();
+
+        // Check if this team already voted
+        let hasVoted = false;
+        let myVoteTeamId = null;
+        if (myTeamId) {
+            const voteCheck = await db.query(
+                "SELECT voted_for_team_id FROM poll_votes WHERE poll_id = $1 AND voter_team_id = $2",
+                [poll.id, myTeamId]
+            );
+            hasVoted = voteCheck.rows.length > 0;
+            myVoteTeamId = voteCheck.rows[0]?.voted_for_team_id || null;
+        }
+
+        // Get all teams to vote for (everyone can vote for any team)
+        const teams = await db.query(
+            "SELECT id, team_name FROM teams ORDER BY team_name ASC"
+        );
+
+        // Only reveal vote counts if poll is completed
+        let results = null;
+        if (!isActive) {
+            const voteCounts = await db.query(`
+                SELECT pv.voted_for_team_id, t.team_name, t.team_type,
+                       COUNT(*) as vote_count
+                FROM poll_votes pv
+                JOIN teams t ON t.id = pv.voted_for_team_id
+                WHERE pv.poll_id = $1
+                GROUP BY pv.voted_for_team_id, t.team_name, t.team_type
+                ORDER BY vote_count DESC
+            `, [poll.id]);
+            results = voteCounts.rows.map(r => ({
+                team_id: r.voted_for_team_id,
+                team_name: r.team_name,
+                team_type: r.team_type,
+                vote_count: parseInt(r.vote_count)
+            }));
+        }
+
+        res.json({
+            poll: { ...poll, is_active: isActive },
+            teams: teams.rows,
+            has_voted: hasVoted,
+            my_vote_team_id: myVoteTeamId,
+            my_team_id: myTeamId,
+            results // null while active
+        });
+    } catch (error) {
+        console.error("Get poll error:", error);
+        res.status(500).json({ message: "Error fetching poll" });
+    }
+});
+
+// Cast a vote
+router.post("/poll/vote", verifyToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { voted_for_team_id } = req.body;
+
+        // Get voter's team
+        const teamResult = await db.query(
+            "SELECT team_id FROM team_members WHERE user_id = $1",
+            [userId]
+        );
+        if (!teamResult.rows.length) {
+            return res.status(404).json({ message: "You are not in a team" });
+        }
+        const myTeamId = teamResult.rows[0].team_id;
+
+        // Get active poll
+        const pollResult = await db.query(
+            "SELECT * FROM polls WHERE status = 'active' AND ends_at > NOW() ORDER BY created_at DESC LIMIT 1"
+        );
+        if (!pollResult.rows.length) {
+            return res.status(400).json({ message: "No active poll" });
+        }
+        const poll = pollResult.rows[0];
+
+        // Can't vote for your own team
+        if (parseInt(voted_for_team_id) === myTeamId) {
+            return res.status(400).json({ message: "You cannot vote for your own team" });
+        }
+
+        // Verify target team exists
+        const targetTeam = await db.query("SELECT id, team_name FROM teams WHERE id = $1", [voted_for_team_id]);
+        if (!targetTeam.rows.length) {
+            return res.status(404).json({ message: "Target team not found" });
+        }
+
+        // Upsert vote (each team can change their vote while poll is active)
+        await db.query(`
+            INSERT INTO poll_votes (poll_id, voter_team_id, voted_for_team_id)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (poll_id, voter_team_id)
+            DO UPDATE SET voted_for_team_id = $3, created_at = NOW()
+        `, [poll.id, myTeamId, voted_for_team_id]);
+
+        res.json({ message: "Vote cast successfully", voted_for: targetTeam.rows[0].team_name });
+    } catch (error) {
+        console.error("Cast vote error:", error);
+        res.status(500).json({ message: "Error casting vote" });
+    }
+});
+
 module.exports = router;

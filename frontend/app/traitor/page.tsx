@@ -33,6 +33,7 @@ import GameTimer from "@/components/GameTimer";
 import TraitorControls from "@/components/TraitorControls";
 import ClueDisplay from "@/components/ClueDisplay";
 import PlayerLeaderboard from "@/components/PlayerLeaderboard";
+import TraitorPoll from "@/components/TraitorPoll";
 
 interface TeamMember {
     id: number;
@@ -581,6 +582,9 @@ export default function TraitorDashboard() {
                         </Box>
                     )}
                 </Container>
+
+                {/* Traitor Poll — auto-shows via socket */}
+                <TraitorPoll />
 
                 {/* QR Scanner Dialog */}
                 <Dialog

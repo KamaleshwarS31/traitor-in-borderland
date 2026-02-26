@@ -101,6 +101,11 @@ export const adminAPI = {
     // Extra Points
     addExtraPoints: (teamId: number, data: { points: number, reason?: string }) =>
         api.post(`/api/admin/teams/${teamId}/extra-points`, data),
+
+    // Poll Management
+    startPoll: () => api.post("/api/admin/start-poll"),
+    getCurrentPollAdmin: () => api.get("/api/admin/poll/current"),
+    endPoll: (id: number) => api.post(`/api/admin/poll/${id}/end`),
 };
 
 // Team APIs
@@ -128,6 +133,10 @@ export const gameAPI = {
     getInnocentTeams: () => api.get("/api/game/innocent-teams"),
     getSabotageStatus: () => api.get("/api/game/sabotage-status"),
     getSabotageCooldown: () => api.get("/api/game/sabotage-cooldown"),
+
+    // Poll
+    getCurrentPoll: () => api.get("/api/game/poll/current"),
+    castVote: (data: { voted_for_team_id: number }) => api.post("/api/game/poll/vote", data),
 };
 
 export default api;
