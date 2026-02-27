@@ -5,7 +5,7 @@ import {
     Card, CardContent, Typography, Box, Button,
     LinearProgress, Chip, Divider, Alert, CircularProgress
 } from "@mui/material";
-import { HowToVote, PlayArrow, Stop, Refresh } from "@mui/icons-material";
+import { HowToVote, PlayArrow, Stop, Refresh, RestartAlt } from "@mui/icons-material";
 import { adminAPI } from "@/lib/api";
 import socket from "@/lib/socket";
 
@@ -29,6 +29,7 @@ export default function PollControl() {
     const [loading, setLoading] = useState(false);
     const [starting, setStarting] = useState(false);
     const [ending, setEnding] = useState(false);
+    const [resetting, setResetting] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
     const [timeLeft, setTimeLeft] = useState(0);
@@ -66,7 +67,12 @@ export default function PollControl() {
     useEffect(() => {
         socket.on("poll_started", () => { loadPoll(); setSuccess("Poll started!"); });
         socket.on("poll_ended", () => { loadPoll(); setSuccess("Poll ended — results available."); });
-        return () => { socket.off("poll_started"); socket.off("poll_ended"); };
+        socket.on("poll_reset", () => { loadPoll(); setSuccess("All poll data has been reset."); });
+        return () => {
+            socket.off("poll_started");
+            socket.off("poll_ended");
+            socket.off("poll_reset");
+        };
     }, [loadPoll]);
 
     const handleStart = async () => {
@@ -96,6 +102,21 @@ export default function PollControl() {
             setError(err.response?.data?.message || "Failed to end poll");
         } finally {
             setEnding(false);
+        }
+    };
+
+    const handleReset = async () => {
+        if (!confirm("Are you sure? This will delete all vote history and current polls. Vote counts will start from 0.")) return;
+        setResetting(true);
+        setError("");
+        try {
+            await adminAPI.resetPoll();
+            setSuccess("Poll data reset successfully.");
+            await loadPoll();
+        } catch (err: any) {
+            setError(err.response?.data?.message || "Failed to reset poll");
+        } finally {
+            setResetting(false);
         }
     };
 
@@ -180,6 +201,7 @@ export default function PollControl() {
                     >
                         Start Poll (1m 45s)
                     </Button>
+
                     {isActive && (
                         <Button
                             variant="outlined"
@@ -195,6 +217,19 @@ export default function PollControl() {
                             End Early
                         </Button>
                     )}
+                    <Button
+                        variant="outlined"
+                        startIcon={resetting ? <CircularProgress size={16} color="inherit" /> : <RestartAlt />}
+                        onClick={handleReset}
+                        disabled={resetting}
+                        sx={{
+                            color: "rgba(255,255,255,0.6)",
+                            borderColor: "rgba(255,255,255,0.2)",
+                            "&:hover": { borderColor: "rgba(255,255,255,0.4)", bgcolor: "rgba(255,255,255,0.05)" }
+                        }}
+                    >
+                        Reset Poll Data
+                    </Button>
                     <Button
                         variant="text"
                         startIcon={<Refresh />}
@@ -252,6 +287,6 @@ export default function PollControl() {
                     </Typography>
                 )}
             </CardContent>
-        </Card>
+        </Card >
     );
 }

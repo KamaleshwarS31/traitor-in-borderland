@@ -711,6 +711,10 @@ router.post("/reset-game", async (req, res) => {
         // Clear scans history
         await db.query("DELETE FROM scans_history");
 
+        // Clear polls and votes
+        await db.query("DELETE FROM poll_votes");
+        await db.query("DELETE FROM polls");
+
         // Emit game reset event
         io.emit("game_reset");
 
@@ -1169,6 +1173,22 @@ router.get("/poll/current", async (req, res) => {
     } catch (error) {
         console.error("Get poll error:", error);
         res.status(500).json({ message: "Error fetching poll" });
+    }
+});
+
+// Reset all poll data (manual)
+router.post("/poll/reset", async (req, res) => {
+    try {
+        await db.query("DELETE FROM poll_votes");
+        await db.query("DELETE FROM polls");
+
+        const io = req.app.get("io");
+        io.emit("poll_reset"); // Notify clients to clear state
+
+        res.json({ message: "Poll data reset successfully" });
+    } catch (error) {
+        console.error("Reset poll error:", error);
+        res.status(500).json({ message: "Error resetting poll data" });
     }
 });
 

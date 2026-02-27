@@ -117,9 +117,18 @@ export default function TraitorPoll() {
             loadPoll();
         });
 
+        socket.on("poll_reset", () => {
+            setOpen(false);
+            setPollData(null);
+            setShowResult(false);
+            setSelectedTeam(null);
+            loadPoll();
+        });
+
         return () => {
             socket.off("poll_started");
             socket.off("poll_ended");
+            socket.off("poll_reset");
         };
     }, [loadPoll]);
 

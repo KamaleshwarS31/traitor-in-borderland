@@ -108,6 +108,7 @@ export const adminAPI = {
     startPoll: () => api.post("/api/admin/start-poll"),
     getCurrentPollAdmin: () => api.get("/api/admin/poll/current"),
     endPoll: (id: number) => api.post(`/api/admin/poll/${id}/end`),
+    resetPoll: () => api.post("/api/admin/poll/reset"),
 };
 
 // Team APIs
