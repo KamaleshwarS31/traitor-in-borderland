@@ -8,22 +8,28 @@ import { QrCodeScanner, Close } from "@mui/icons-material";
 interface QRScannerProps {
     onScan: (data: string) => void;
     onClose: () => void;
+    allowManualEntry?: boolean;
+    manualEntryLabel?: string;
+    manualEntryPlaceholder?: string;
 }
 
-export default function QRScanner({ onScan, onClose }: QRScannerProps) {
+export default function QRScanner({
+    onScan,
+    onClose,
+    allowManualEntry = false,
+    manualEntryLabel = "Can't scan? Enter code manually",
+    manualEntryPlaceholder = "Enter 6-digit code"
+}: QRScannerProps) {
     const [scanning, setScanning] = useState(false);
     const scannerRef = useRef<Html5Qrcode | null>(null);
     const [error, setError] = useState("");
+    const [manualCode, setManualCode] = useState("");
+    const [showManual, setShowManual] = useState(false);
 
     useEffect(() => {
         return () => {
             if (scannerRef.current) {
-                // Try strictly stopping the scanner instance directly
-                // We use a local reference to ensure we are stopping the correct instance
                 const scanner = scannerRef.current;
-
-                // .stop() returns a Promise. We must catch errors to prevent unhandled rejections/crashes
-                // specifically "scanner is not running" which is common during unmounts
                 scanner.stop().catch((err) => {
                     const msg = err?.message || err?.toString() || "";
                     if (!msg.includes("not running") && !msg.includes("is not running")) {
@@ -51,11 +57,12 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
                     stopScanning();
                 },
                 (errorMessage) => {
-                    // Ignore scan errors (happens continuously while scanning)
+                    // Ignore scan errors
                 }
             );
 
             setScanning(true);
+            setShowManual(false);
         } catch (err: any) {
             console.error("Scanner error:", err);
             setError("Failed to start camera. Please allow camera access.");
@@ -65,12 +72,8 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
     const stopScanning = async () => {
         if (scannerRef.current) {
             try {
-                // Check if scanner is running before stopping to avoid "not running" error
-                // Html5Qrcode doesn't expose a clean isRunning method, so we blindly try stop
-                // and catch the specific error if it happens.
                 await scannerRef.current.stop();
             } catch (err: any) {
-                // Ignore "not running" error
                 if (err?.message && !err.message.includes("not running")) {
                     console.error("Stop scanner error:", err);
                 }
@@ -81,13 +84,21 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
         }
     };
 
+    const handleManualSubmit = () => {
+        if (!manualCode) return;
+        onScan(manualCode);
+        onClose();
+    };
+
     return (
         <Paper
             sx={{
-                p: 3,
+                p: { xs: 2, sm: 3 },
                 background: "linear-gradient(135deg, #1E293B 0%, #334155 100%)",
                 border: "1px solid rgba(255, 255, 255, 0.1)",
                 borderRadius: 4,
+                width: "100%",
+                maxWidth: 500
             }}
         >
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
@@ -99,14 +110,14 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
                     size="small"
                     onClick={onClose}
                     startIcon={<Close />}
-                    sx={{ borderColor: "rgba(255, 255, 255, 0.3)" }}
+                    sx={{ borderColor: "rgba(255, 255, 255, 0.3)", color: "white" }}
                 >
                     Close
                 </Button>
             </Box>
 
             {error && (
-                <Typography color="error" sx={{ mb: 2 }}>
+                <Typography color="error" sx={{ mb: 2, textAlign: "center", fontSize: "0.875rem" }}>
                     {error}
                 </Typography>
             )}
@@ -120,45 +131,113 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
                     mb: 2,
                     borderRadius: 2,
                     overflow: "hidden",
+                    display: showManual ? "none" : "block",
+                    background: "rgba(0,0,0,0.3)",
+                    aspectRatio: "1/1",
                     "& video": {
                         borderRadius: 2,
+                        objectFit: "cover"
                     },
                 }}
             />
 
-            {!scanning && (
-                <Button
-                    fullWidth
-                    variant="contained"
-                    size="large"
-                    onClick={startScanning}
-                    startIcon={<QrCodeScanner />}
-                    sx={{
-                        background: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)",
-                        "&:hover": {
-                            background: "linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)",
-                        },
-                    }}
-                >
-                    Start Scanning
-                </Button>
+            {showManual && (
+                <Box sx={{ py: 4, px: 2, textAlign: "center", background: "rgba(0,0,0,0.2)", borderRadius: 2, mb: 2 }}>
+                    <Typography variant="body2" sx={{ mb: 2, color: "text.secondary" }}>
+                        Enter the unique 6-digit code from the gold bar
+                    </Typography>
+                    <TextField
+                        fullWidth
+                        placeholder={manualEntryPlaceholder}
+                        value={manualCode}
+                        onChange={(e) => setManualCode(e.target.value.toUpperCase())}
+                        autoFocus
+                        inputProps={{
+                            maxLength: 10,
+                            sx: {
+                                textAlign: "center",
+                                fontSize: "1.5rem",
+                                fontWeight: 900,
+                                letterSpacing: 8,
+                                fontFamily: "monospace",
+                                color: "#EAB308"
+                            }
+                        }}
+                        sx={{
+                            mb: 3,
+                            "& .MuiOutlinedInput-root": {
+                                "& fieldset": { borderColor: "rgba(234, 179, 8, 0.3)" },
+                                "&:hover fieldset": { borderColor: "rgba(234, 179, 8, 0.5)" },
+                                "&.Mui-focused fieldset": { borderColor: "#EAB308" },
+                            }
+                        }}
+                    />
+                    <Button
+                        fullWidth
+                        variant="contained"
+                        onClick={handleManualSubmit}
+                        disabled={!manualCode}
+                        sx={{
+                            background: "linear-gradient(135deg, #EAB308 0%, #D97706 100%)",
+                            color: "black",
+                            fontWeight: 700,
+                            py: 1.5
+                        }}
+                    >
+                        SUBMIT CODE
+                    </Button>
+                </Box>
             )}
 
-            {scanning && (
-                <Button
-                    fullWidth
-                    variant="outlined"
-                    size="large"
-                    onClick={stopScanning}
-                    sx={{ borderColor: "rgba(255, 255, 255, 0.3)" }}
-                >
-                    Stop Scanning
-                </Button>
-            )}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+                {!scanning && !showManual && (
+                    <Button
+                        fullWidth
+                        variant="contained"
+                        size="large"
+                        onClick={startScanning}
+                        startIcon={<QrCodeScanner />}
+                        sx={{
+                            background: "linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)",
+                            "&:hover": {
+                                background: "linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)",
+                            },
+                        }}
+                    >
+                        Use Camera
+                    </Button>
+                )}
 
-            <Typography variant="caption" sx={{ display: "block", textAlign: "center", mt: 2, color: "text.secondary" }}>
-                Point your camera at a QR code to scan
-            </Typography>
+                {scanning && (
+                    <Button
+                        fullWidth
+                        variant="outlined"
+                        size="large"
+                        onClick={stopScanning}
+                        sx={{ borderColor: "rgba(255, 255, 255, 0.3)", color: "white" }}
+                    >
+                        Stop Camera
+                    </Button>
+                )}
+
+                {allowManualEntry && !scanning && (
+                    <Button
+                        fullWidth
+                        variant="text"
+                        onClick={() => setShowManual(!showManual)}
+                        sx={{ color: showManual ? "text.secondary" : "#EAB308" }}
+                    >
+                        {showManual ? "← Back to scanner" : manualEntryLabel}
+                    </Button>
+                )}
+            </Box>
+
+            {!showManual && (
+                <Typography variant="caption" sx={{ display: "block", textAlign: "center", mt: 2, color: "text.secondary" }}>
+                    Point camera at gold bar QR code or enter code manually
+                </Typography>
+            )}
         </Paper>
     );
 }
+
