@@ -58,6 +58,7 @@ CREATE TABLE gold_bars (
     is_scanned BOOLEAN DEFAULT FALSE,
     scanned_by_team_id INTEGER REFERENCES teams(id),
     scanned_at TIMESTAMP,
+    entry_code VARCHAR(10) UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -73,6 +74,7 @@ CREATE TABLE game_state (
     sabotage_cooldown INTEGER DEFAULT 120,
     sabotage_same_person_cooldown INTEGER DEFAULT 300,
     game_status VARCHAR(50) DEFAULT 'not_started',
+    is_leaderboard_published BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
