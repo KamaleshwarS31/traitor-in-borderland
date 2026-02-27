@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import { Box, Button, Typography, Paper } from "@mui/material";
+import { Box, Button, Typography, Paper, TextField } from "@mui/material";
 import { QrCodeScanner, Close } from "@mui/icons-material";
 
 interface QRScannerProps {

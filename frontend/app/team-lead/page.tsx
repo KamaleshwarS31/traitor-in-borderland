@@ -36,6 +36,7 @@ import TraitorControls from "@/components/TraitorControls";
 import TeamInfoCard from "@/components/TeamInfoCard";
 import ClueDisplay from "@/components/ClueDisplay";
 import PlayerLeaderboard from "@/components/PlayerLeaderboard";
+import TraitorPoll from "@/components/TraitorPoll";
 
 interface TeamMember {
     id: number;
@@ -670,6 +671,9 @@ export default function TeamLeadDashboard() {
                         manualEntryPlaceholder="_ _ _ _ _ _"
                     />
                 </Dialog>
+
+                {/* Traitor Poll */}
+                <TraitorPoll />
             </Box >
         </ProtectedRoute >
     );
