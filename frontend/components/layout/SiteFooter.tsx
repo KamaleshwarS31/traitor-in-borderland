@@ -31,6 +31,7 @@ export default function SiteFooter() {
                     alignItems: "center",
                 }}
             >
+                {/* TEMPORARILY HIDDEN
                 <Image
                     src="/healthclub-logo.png"
                     alt="Health Club VIT"
@@ -42,6 +43,7 @@ export default function SiteFooter() {
                         height: "auto",
                     }}
                 />
+                */}
             </Box>
 
             {/* Centre – copyright + attribution */}
@@ -94,6 +96,7 @@ export default function SiteFooter() {
                     alignItems: "center",
                 }}
             >
+                {/* TEMPORARILY HIDDEN
                 <Image
                     src="/vit-40years.png"
                     alt="VIT 40 Years"
@@ -105,6 +108,7 @@ export default function SiteFooter() {
                         height: "auto",
                     }}
                 />
+                */}
             </Box>
         </Box>
     );
