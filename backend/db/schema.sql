@@ -27,6 +27,9 @@ CREATE TABLE teams (
     team_type VARCHAR(50) NOT NULL,
     total_score INTEGER DEFAULT 0,
     team_lead_id INTEGER REFERENCES users(id),
+    last_latitude DOUBLE PRECISION,
+    last_longitude DOUBLE PRECISION,
+    location_updated_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -48,6 +51,9 @@ CREATE TABLE locations (
 );
 
 -- Gold bars table
+-- location_id = where the QR is physically placed
+-- clue_text = the clue that points TO this location (given to teams BEFORE they reach here)
+-- clue_location_id is kept for backward compat but unused in new flow
 CREATE TABLE gold_bars (
     id SERIAL PRIMARY KEY,
     qr_code VARCHAR(255) UNIQUE NOT NULL,
@@ -75,6 +81,8 @@ CREATE TABLE game_state (
     sabotage_same_person_cooldown INTEGER DEFAULT 300,
     game_status VARCHAR(50) DEFAULT 'not_started',
     is_leaderboard_published BOOLEAN DEFAULT FALSE,
+    sabotage_enabled BOOLEAN DEFAULT TRUE,
+    scan_limit INTEGER DEFAULT 4,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -113,8 +121,8 @@ CREATE TABLE scans_history (
 );
 
 -- Insert initial game state
-INSERT INTO game_state (id, total_rounds, round_duration, sabotage_duration, sabotage_cooldown, sabotage_same_person_cooldown)
-VALUES (1, 4, 600, 60, 120, 300);
+INSERT INTO game_state (id, total_rounds, round_duration, sabotage_duration, sabotage_cooldown, sabotage_same_person_cooldown, sabotage_enabled, scan_limit)
+VALUES (1, 4, 600, 60, 120, 300, TRUE, 4);
 
 -- Create indexes for performance
 CREATE INDEX idx_teams_team_code ON teams(team_code);

@@ -40,11 +40,10 @@ export const adminAPI = {
         points: number;
         location_id: number;
         clue_text: string;
-        clue_location_id: number;
     }) => api.post("/api/admin/gold-bars", data),
     getGoldBars: () => api.get("/api/admin/gold-bars"),
     getGoldBarQR: (id: number) => api.get(`/api/admin/gold-bars/${id}/qr`),
-    updateGoldBar: (id: number, data: { points?: number; location_id?: number; clue_text?: string; clue_location_id?: number }) =>
+    updateGoldBar: (id: number, data: { points?: number; location_id?: number; clue_text?: string }) =>
         api.put(`/api/admin/gold-bars/${id}`, data),
     deleteGoldBar: (id: number) => api.delete(`/api/admin/gold-bars/${id}`),
 
@@ -109,6 +108,17 @@ export const adminAPI = {
     getCurrentPollAdmin: () => api.get("/api/admin/poll/current"),
     endPoll: (id: number) => api.post(`/api/admin/poll/${id}/end`),
     resetPoll: () => api.post("/api/admin/poll/reset"),
+
+    // Sabotage Toggle
+    toggleSabotage: (enabled: boolean) => api.post("/api/admin/toggle-sabotage", { enabled }),
+
+    // Manual Clue Assignment
+    assignClue: (data: { team_id: number; gold_bar_id: number }) =>
+        api.post("/api/admin/assign-clue", data),
+    getAllTeams: () => api.get("/api/admin/teams"),
+
+    // Scan Limit
+    updateScanLimit: (scan_limit: number) => api.put("/api/admin/scan-limit", { scan_limit }),
 };
 
 // Team APIs
@@ -136,6 +146,8 @@ export const gameAPI = {
     getInnocentTeams: () => api.get("/api/game/innocent-teams"),
     getSabotageStatus: () => api.get("/api/game/sabotage-status"),
     getSabotageCooldown: () => api.get("/api/game/sabotage-cooldown"),
+    updateLocation: (data: { latitude: number; longitude: number }) =>
+        api.post("/api/game/update-location", data),
 
     // Poll
     getCurrentPoll: () => api.get("/api/game/poll/current"),

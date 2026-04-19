@@ -301,7 +301,12 @@ router.post("/scan-gold-bar", async (req, res) => {
 
         const teamId = teamResult.rows[0].team_id;
 
-        // Check scan limit (4 per round)
+        // Check scan limit (from game_state.scan_limit, defaults to 4)
+        const scanLimitResult = await db.query(`
+            SELECT COALESCE(scan_limit, 4) as scan_limit FROM game_state WHERE id = 1
+        `);
+        const scanLimit = parseInt(scanLimitResult.rows[0]?.scan_limit || 4);
+
         const scanCountResult = await db.query(`
             SELECT COUNT(*) FROM scans_history 
             WHERE team_id = $1 
@@ -309,9 +314,9 @@ router.post("/scan-gold-bar", async (req, res) => {
         `, [teamId]);
         const scanCount = parseInt(scanCountResult.rows[0].count);
 
-        if (scanCount >= 4) {
+        if (scanCount >= scanLimit) {
             return res.status(403).json({
-                message: "Scanning limit completed! You can only scan 4 gold bars per round.",
+                message: `Scanning limit completed! You can only scan ${scanLimit} gold bars per round.`,
                 limit_reached: true
             });
         }
@@ -344,60 +349,67 @@ router.post("/scan-gold-bar", async (req, res) => {
 
             const goldBar = goldBarResult.rows[0];
 
+            // === NEW: Verify QR matches the team's current clue ===
+            // The team's clue should point to THIS gold bar (matches next_gold_bar_id)
+            const clueCheck = await client.query("SELECT next_gold_bar_id, current_clue_text FROM team_clues WHERE team_id = $1", [teamId]);
+            if (clueCheck.rows.length > 0) {
+                const currentTarget = clueCheck.rows[0].next_gold_bar_id;
+                if (currentTarget && parseInt(currentTarget) !== parseInt(goldBar.id)) {
+                    await client.query("ROLLBACK");
+                    return res.status(400).json({
+                        message: "This QR code does not match your current clue! Follow the clue to find the correct gold bar.",
+                        wrong_target: true
+                    });
+                }
+            }
+
             // 1. Check if already scanned by ANYONE
             if (goldBar.is_scanned) {
-                // If it was their target, give them a new clue so they aren't stuck
-                const clueCheck = await client.query("SELECT next_gold_bar_id FROM team_clues WHERE team_id = $1", [teamId]);
-                const isTarget = clueCheck.rows.length > 0 && clueCheck.rows[0].next_gold_bar_id === goldBar.id;
+                // Give a new clue so they aren't stuck
+                const nextGoldBarRes = await client.query(`
+                    SELECT id, clue_text, location_id FROM gold_bars 
+                    WHERE is_scanned = FALSE ORDER BY RANDOM() LIMIT 1
+                `);
 
                 let nextClue = null;
-                if (isTarget) {
-                    const nextGoldBarRes = await client.query(`
-                        SELECT id, clue_text, clue_location_id FROM gold_bars 
-                        WHERE is_scanned = FALSE ORDER BY RANDOM() LIMIT 1
-                    `);
-
-                    if (nextGoldBarRes.rows.length > 0) {
-                        const nextGB = nextGoldBarRes.rows[0];
-                        await client.query(`
-                            INSERT INTO team_clues (team_id, current_clue_text, current_clue_location_id, next_gold_bar_id, updated_at)
-                            VALUES ($4, $1, $2, $3, CURRENT_TIMESTAMP)
-                            ON CONFLICT (team_id) DO UPDATE SET 
-                                current_clue_text = $1, current_clue_location_id = $2,
-                                next_gold_bar_id = $3, updated_at = CURRENT_TIMESTAMP
-                        `, [nextGB.clue_text, nextGB.clue_location_id, nextGB.id, teamId]);
-                        nextClue = nextGB.clue_text;
-                    }
+                if (nextGoldBarRes.rows.length > 0) {
+                    const nextGB = nextGoldBarRes.rows[0];
+                    await client.query(`
+                        INSERT INTO team_clues (team_id, current_clue_text, current_clue_location_id, next_gold_bar_id, updated_at)
+                        VALUES ($4, $1, $2, $3, CURRENT_TIMESTAMP)
+                        ON CONFLICT (team_id) DO UPDATE SET 
+                            current_clue_text = $1, current_clue_location_id = $2,
+                            next_gold_bar_id = $3, updated_at = CURRENT_TIMESTAMP
+                    `, [nextGB.clue_text, nextGB.location_id, nextGB.id, teamId]);
+                    nextClue = nextGB.clue_text;
                 }
 
                 await client.query("COMMIT");
 
-                if (isTarget) {
-                    // Update the team via socket
-                    io.to(`team_${teamId}`).emit("score_update", { points: 0, total_score: null, next_clue: nextClue });
-                }
+                io.to(`team_${teamId}`).emit("score_update", { points: 0, total_score: null, next_clue: nextClue });
 
                 return res.json({
                     success: false,
-                    message: isTarget
-                        ? "Someone else collected this bar first! We've assigned you a new clue."
-                        : "This gold bar has already been collected by another team.",
+                    message: "Someone else collected this bar first! We've assigned you a new clue.",
                     next_clue: nextClue,
                     points: 0
                 });
             }
 
-            // 2. Check if it's their target (we allow scanning any bar now)
-            const clueCheck = await client.query("SELECT next_gold_bar_id FROM team_clues WHERE team_id = $1", [teamId]);
-            const currentTargetId = clueCheck.rows.length > 0 ? clueCheck.rows[0].next_gold_bar_id : null;
-            const isTarget = currentTargetId === goldBar.id;
+            // 2. Check sabotage status (and if sabotage is enabled globally)
+            const gameSettingsForSab = await client.query("SELECT COALESCE(sabotage_enabled, TRUE) as sabotage_enabled FROM game_state WHERE id = 1");
+            const sabotageFeatureEnabled = gameSettingsForSab.rows[0]?.sabotage_enabled !== false;
 
             // 3. Check sabotage
-            const sabotageResult = await client.query(`
-                SELECT * FROM sabotages WHERE target_team_id = $1 AND is_active = TRUE AND sabotage_end_time > NOW()
-            `, [teamId]);
-            const isSabotaged = sabotageResult.rows.length > 0;
-            const sabotageEndTime = isSabotaged ? sabotageResult.rows[0].sabotage_end_time : null;
+            let isSabotaged = false;
+            let sabotageEndTime = null;
+            if (sabotageFeatureEnabled) {
+                const sabotageResult = await client.query(`
+                    SELECT * FROM sabotages WHERE target_team_id = $1 AND is_active = TRUE AND sabotage_end_time > NOW()
+                `, [teamId]);
+                isSabotaged = sabotageResult.rows.length > 0;
+                sabotageEndTime = isSabotaged ? sabotageResult.rows[0].sabotage_end_time : null;
+            }
 
             // 4. Update Gold Bar status
             await client.query(`
@@ -420,7 +432,7 @@ router.post("/scan-gold-bar", async (req, res) => {
             // 7. Assign next clue (always assign a new one after any successful scan)
             let nextClue = null;
             const nextGoldBarRes = await client.query(`
-                SELECT id, clue_text, clue_location_id FROM gold_bars WHERE is_scanned = FALSE ORDER BY RANDOM() LIMIT 1
+                SELECT id, clue_text, location_id FROM gold_bars WHERE is_scanned = FALSE ORDER BY RANDOM() LIMIT 1
             `);
 
             if (nextGoldBarRes.rows.length > 0) {
@@ -431,7 +443,7 @@ router.post("/scan-gold-bar", async (req, res) => {
                     ON CONFLICT (team_id) DO UPDATE SET 
                         current_clue_text = $1, current_clue_location_id = $2,
                         next_gold_bar_id = $3, updated_at = CURRENT_TIMESTAMP
-                `, [nextGB.clue_text, nextGB.clue_location_id, nextGB.id, teamId]);
+                `, [nextGB.clue_text, nextGB.location_id, nextGB.id, teamId]);
                 nextClue = nextGB.clue_text;
             }
 

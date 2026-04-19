@@ -54,14 +54,13 @@ export default function GoldBarsManager() {
     const [loadingQR, setLoadingQR] = useState(false);
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [editingBar, setEditingBar] = useState<GoldBar | null>(null);
-    const [editForm, setEditForm] = useState({ points: "", location_id: "", clue_text: "", clue_location_id: "" });
+    const [editForm, setEditForm] = useState({ points: "", location_id: "", clue_text: "" });
     const [editSubmitting, setEditSubmitting] = useState(false);
 
     const [formData, setFormData] = useState({
         points: "",
         location_id: "",
         clue_text: "",
-        clue_location_id: "",
     });
 
     useEffect(() => {
@@ -91,7 +90,6 @@ export default function GoldBarsManager() {
                 points: parseInt(formData.points),
                 location_id: parseInt(formData.location_id),
                 clue_text: formData.clue_text,
-                clue_location_id: parseInt(formData.clue_location_id),
             });
 
             // Show QR code
@@ -99,7 +97,6 @@ export default function GoldBarsManager() {
             setSelectedGoldBar({
                 ...response.data,
                 location_name: locations.find((l) => l.id === parseInt(formData.location_id))?.location_name || "",
-                clue_location_name: locations.find((l) => l.id === parseInt(formData.clue_location_id))?.location_name || "",
             });
             setQrDialogOpen(true);
 
@@ -108,7 +105,6 @@ export default function GoldBarsManager() {
                 points: "",
                 location_id: "",
                 clue_text: "",
-                clue_location_id: "",
             });
 
             // Refresh list
@@ -290,14 +286,11 @@ export default function GoldBarsManager() {
 
     const handleOpenEdit = (bar: GoldBar) => {
         setEditingBar(bar);
-        // Find location_id by matching location_name in locations list
         const loc = locations.find(l => l.location_name === bar.location_name);
-        const clueLoc = locations.find(l => l.location_name === bar.clue_location_name);
         setEditForm({
             points: String(bar.points),
             location_id: loc ? String(loc.id) : "",
             clue_text: bar.clue_text,
-            clue_location_id: clueLoc ? String(clueLoc.id) : "",
         });
         setEditDialogOpen(true);
     };
@@ -311,7 +304,6 @@ export default function GoldBarsManager() {
                 points: parseInt(editForm.points),
                 location_id: parseInt(editForm.location_id),
                 clue_text: editForm.clue_text,
-                clue_location_id: parseInt(editForm.clue_location_id),
             });
             setEditDialogOpen(false);
             setEditingBar(null);
@@ -367,46 +359,29 @@ export default function GoldBarsManager() {
 
                                 <TextField
                                     fullWidth
-                                    label="Clue Text"
+                                    label="Clue Text (points players TO this location)"
                                     value={formData.clue_text}
                                     onChange={(e) => setFormData({ ...formData, clue_text: e.target.value })}
                                     required
                                     multiline
                                     rows={2}
-                                    sx={{ mb: 2 }}
-                                    placeholder="Where knowledge meets wisdom..."
+                                    sx={{ mb: 3 }}
+                                    placeholder="Clue that leads players to this QR's location..."
                                 />
-
-                                <FormControl fullWidth sx={{ mb: 3 }}>
-                                    <InputLabel>Clue Points To</InputLabel>
-                                    <Select
-                                        value={formData.clue_location_id}
-                                        onChange={(e) => setFormData({ ...formData, clue_location_id: e.target.value })}
-                                        required
-                                    >
-                                        {locations
-                                            .filter((loc) => loc.id.toString() !== formData.location_id)
-                                            .map((loc) => (
-                                                <MenuItem key={loc.id} value={loc.id}>
-                                                    {loc.location_name}
-                                                </MenuItem>
-                                            ))}
-                                    </Select>
-                                </FormControl>
 
                                 <Button
                                     type="submit"
                                     variant="contained"
                                     startIcon={<Add />}
-                                    disabled={submitting || locations.length < 2}
+                                    disabled={submitting || locations.length < 1}
                                     fullWidth
                                 >
                                     {submitting ? "Creating..." : "Create Gold Bar"}
                                 </Button>
 
-                                {locations.length < 2 && (
+                                {locations.length < 1 && (
                                     <Typography variant="caption" color="error" sx={{ mt: 1, display: "block" }}>
-                                        You need at least 2 locations to create a gold bar
+                                        You need at least 1 location to create a gold bar
                                     </Typography>
                                 )}
                             </Box>
@@ -575,13 +550,10 @@ export default function GoldBarsManager() {
                                     {selectedGoldBar && (
                                         <Box sx={{ mb: 2, textAlign: "left", p: 2, bgcolor: "rgba(255, 255, 255, 0.05)", borderRadius: 2 }}>
                                             <Typography variant="body2" sx={{ mb: 1 }}>
-                                                <strong>Location:</strong> {selectedGoldBar.location_name}
-                                            </Typography>
-                                            <Typography variant="body2" sx={{ mb: 1 }}>
-                                                <strong>Clue:</strong> {selectedGoldBar.clue_text}
+                                                <strong>Location (QR placed here):</strong> {selectedGoldBar.location_name}
                                             </Typography>
                                             <Typography variant="body2" sx={{ mb: 2 }}>
-                                                <strong>Points to:</strong> {selectedGoldBar.clue_location_name}
+                                                <strong>Clue (leads players here):</strong> {selectedGoldBar.clue_text}
                                             </Typography>
                                             {selectedGoldBar.entry_code && (
                                                 <Box sx={{
@@ -678,7 +650,7 @@ export default function GoldBarsManager() {
 
                         <TextField
                             fullWidth
-                            label="Clue Text"
+                            label="Clue Text (leads players TO this location)"
                             value={editForm.clue_text}
                             onChange={(e) => setEditForm({ ...editForm, clue_text: e.target.value })}
                             required
@@ -686,24 +658,6 @@ export default function GoldBarsManager() {
                             rows={2}
                             sx={{ mb: 3, input: { color: 'white' }, label: { color: 'text.secondary' } }}
                         />
-
-                        <FormControl fullWidth sx={{ mb: 3 }}>
-                            <InputLabel sx={{ color: 'text.secondary' }}>Clue Points To</InputLabel>
-                            <Select
-                                value={editForm.clue_location_id}
-                                onChange={(e) => setEditForm({ ...editForm, clue_location_id: e.target.value })}
-                                required
-                                sx={{ color: 'white', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.2)' } }}
-                            >
-                                {locations
-                                    .filter((loc) => loc.id.toString() !== editForm.location_id)
-                                    .map((loc) => (
-                                        <MenuItem key={loc.id} value={loc.id}>
-                                            {loc.location_name}
-                                        </MenuItem>
-                                    ))}
-                            </Select>
-                        </FormControl>
 
                         {editingBar?.entry_code && (
                             <Box sx={{ p: 2, bgcolor: "rgba(255,255,255,0.05)", borderRadius: 1, border: "1px dashed rgba(255,255,255,0.2)" }}>

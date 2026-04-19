@@ -92,15 +92,13 @@ router.delete("/locations/:id", async (req, res) => {
 
 
 // Create gold bar with QR code
+// New model: location_id = where the QR physically is, clue_text = clue pointing TO this location
 router.post("/gold-bars", async (req, res) => {
     try {
-        const { points, location_id, clue_text, clue_location_id } = req.body;
+        const { points, location_id, clue_text } = req.body;
 
-        // Validate that location and clue location are different
-        if (location_id === clue_location_id) {
-            return res.status(400).json({
-                message: "Gold bar location and clue location must be different"
-            });
+        if (!location_id || !clue_text || !points) {
+            return res.status(400).json({ message: "Points, location, and clue text are required" });
         }
 
         // Generate unique QR code
@@ -115,9 +113,9 @@ router.post("/gold-bars", async (req, res) => {
         }
 
         const result = await db.query(
-            `INSERT INTO gold_bars (qr_code, points, location_id, clue_text, clue_location_id, entry_code) 
-             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-            [qr_code, points, location_id, clue_text, clue_location_id, entry_code]
+            `INSERT INTO gold_bars (qr_code, points, location_id, clue_text, entry_code) 
+             VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+            [qr_code, points, location_id, clue_text, entry_code]
         );
 
         const goldBar = result.rows[0];
@@ -141,11 +139,9 @@ router.get("/gold-bars", async (req, res) => {
         const result = await db.query(`
             SELECT gb.*, 
                    l1.location_name as location_name,
-                   l2.location_name as clue_location_name,
                    t.team_name as scanned_by_team_name
             FROM gold_bars gb
             LEFT JOIN locations l1 ON gb.location_id = l1.id
-            LEFT JOIN locations l2 ON gb.clue_location_id = l2.id
             LEFT JOIN teams t ON gb.scanned_by_team_id = t.id
             ORDER BY gb.created_at DESC
         `);
@@ -205,26 +201,21 @@ router.delete("/gold-bars/:id", async (req, res) => {
 router.put("/gold-bars/:id", async (req, res) => {
     try {
         const { id } = req.params;
-        const { points, location_id, clue_text, clue_location_id } = req.body;
+        const { points, location_id, clue_text } = req.body;
 
         const existing = await db.query("SELECT * FROM gold_bars WHERE id = $1", [id]);
         if (!existing.rows.length) {
             return res.status(404).json({ message: "Gold bar not found" });
         }
 
-        if (location_id && clue_location_id && parseInt(location_id) === parseInt(clue_location_id)) {
-            return res.status(400).json({ message: "Gold bar location and clue location must be different" });
-        }
-
         const result = await db.query(
             `UPDATE gold_bars
              SET points = COALESCE($1, points),
                  location_id = COALESCE($2, location_id),
-                 clue_text = COALESCE($3, clue_text),
-                 clue_location_id = COALESCE($4, clue_location_id)
-             WHERE id = $5
+                 clue_text = COALESCE($3, clue_text)
+             WHERE id = $4
              RETURNING *`,
-            [points || null, location_id || null, clue_text || null, clue_location_id || null, id]
+            [points || null, location_id || null, clue_text || null, id]
         );
 
         res.json(result.rows[0]);
@@ -537,20 +528,28 @@ router.put("/game-settings", async (req, res) => {
             round_duration,
             sabotage_duration,
             sabotage_cooldown,
-            sabotage_same_person_cooldown
+            sabotage_same_person_cooldown,
+            scan_limit
         } = req.body;
+
+        // Add columns if they don't exist (lazy migration)
+        try {
+            await db.query(`ALTER TABLE game_state ADD COLUMN IF NOT EXISTS scan_limit INTEGER DEFAULT 4`);
+            await db.query(`ALTER TABLE game_state ADD COLUMN IF NOT EXISTS sabotage_enabled BOOLEAN DEFAULT TRUE`);
+        } catch(e) { /* ignore */ }
 
         const result = await db.query(`
             UPDATE game_state 
-            SET total_rounds = $1,
-                round_duration = $2,
-                sabotage_duration = $3,
-                sabotage_cooldown = $4,
-                sabotage_same_person_cooldown = $5,
+            SET total_rounds = COALESCE($1, total_rounds),
+                round_duration = COALESCE($2, round_duration),
+                sabotage_duration = COALESCE($3, sabotage_duration),
+                sabotage_cooldown = COALESCE($4, sabotage_cooldown),
+                sabotage_same_person_cooldown = COALESCE($5, sabotage_same_person_cooldown),
+                scan_limit = COALESCE($6, scan_limit),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = 1
             RETURNING *
-        `, [total_rounds, round_duration, sabotage_duration, sabotage_cooldown, sabotage_same_person_cooldown]);
+        `, [total_rounds || null, round_duration || null, sabotage_duration || null, sabotage_cooldown || null, sabotage_same_person_cooldown || null, scan_limit || null]);
 
         res.json(result.rows[0]);
     } catch (error) {
@@ -590,7 +589,7 @@ router.get("/game-settings", async (req, res) => {
     }
 });
 
-// Start round
+// Start round - assigns random clues to all teams at start
 router.post("/start-round", async (req, res) => {
     try {
         const io = req.app.get("io");
@@ -620,7 +619,7 @@ router.post("/start-round", async (req, res) => {
         }
 
         // Check if there are any unscanned gold bars left
-        const goldBarsRes = await db.query("SELECT id, clue_text, clue_location_id FROM gold_bars WHERE is_scanned = FALSE");
+        const goldBarsRes = await db.query("SELECT id, clue_text, location_id FROM gold_bars WHERE is_scanned = FALSE");
         if (goldBarsRes.rows.length === 0) {
             return res.status(400).json({ message: "No unscanned gold bars remaining! Add more gold bars or reset the game." });
         }
@@ -640,14 +639,18 @@ router.post("/start-round", async (req, res) => {
             WHERE id = 1
         `, [newRound, roundStartTime, roundEndTime]);
 
-        // Assign initial clues to all teams
+        // Assign initial clues to all teams at round start (randomly)
+        // The clue assigned references a gold bar - the clue_text is used to guide team to that bar's location
         const teams = await db.query("SELECT id FROM teams");
         const availableBars = goldBarsRes.rows;
 
-        for (const team of teams.rows) {
-            // Randomly assign a gold bar clue to each team
-            const randomIndex = Math.floor(Math.random() * availableBars.length);
-            const goldBar = availableBars[randomIndex];
+        // Shuffle gold bars
+        const shuffled = [...availableBars].sort(() => Math.random() - 0.5);
+
+        for (let i = 0; i < teams.rows.length; i++) {
+            const team = teams.rows[i];
+            // Pick a random bar for each team (they may share clues initially)
+            const goldBar = shuffled[i % shuffled.length];
 
             await db.query(`
                 INSERT INTO team_clues (team_id, current_clue_text, current_clue_location_id, next_gold_bar_id, updated_at)
@@ -658,7 +661,7 @@ router.post("/start-round", async (req, res) => {
                     current_clue_location_id = $3,
                     next_gold_bar_id = $4,
                     updated_at = CURRENT_TIMESTAMP
-            `, [team.id, goldBar.clue_text, goldBar.clue_location_id, goldBar.id]);
+            `, [team.id, goldBar.clue_text, goldBar.location_id, goldBar.id]);
         }
 
         // Emit round start event
@@ -1205,4 +1208,166 @@ router.post("/poll/:id/end", async (req, res) => {
     }
 });
 
+// Toggle sabotage feature on/off
+router.post("/toggle-sabotage", async (req, res) => {
+    try {
+        const { enabled } = req.body; // true = enable, false = disable
+        const io = req.app.get("io");
+
+        // Lazy migration
+        try {
+            await db.query(`ALTER TABLE game_state ADD COLUMN IF NOT EXISTS sabotage_enabled BOOLEAN DEFAULT TRUE`);
+        } catch(e) { /* ignore */ }
+
+        await db.query(
+            "UPDATE game_state SET sabotage_enabled = $1, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
+            [enabled]
+        );
+
+        // When ENABLING, notify all traitors with a message
+        if (enabled) {
+            // Get all traitor teams
+            const traitorTeams = await db.query("SELECT id FROM teams WHERE team_type = 'traitor'");
+            traitorTeams.rows.forEach(team => {
+                io.to(`team_${team.id}`).emit("sabotage_enabled_notification", {
+                    message: "⚡ Sabotage feature is now ACTIVE! You can now sabotage innocent teams."
+                });
+            });
+            // Also broadcast globally so clients can update their state
+            io.emit("sabotage_toggled", { enabled: true });
+        } else {
+            io.emit("sabotage_toggled", { enabled: false });
+        }
+
+        res.json({ message: `Sabotage ${enabled ? "enabled" : "disabled"} successfully`, sabotage_enabled: enabled });
+    } catch (error) {
+        console.error("Toggle sabotage error:", error);
+        res.status(500).json({ message: "Error toggling sabotage" });
+    }
+});
+
+// Manually assign a clue to a team (admin fallback)
+router.post("/assign-clue", async (req, res) => {
+    try {
+        const { team_id, gold_bar_id } = req.body;
+
+        if (!team_id || !gold_bar_id) {
+            return res.status(400).json({ message: "team_id and gold_bar_id are required" });
+        }
+
+        // Get gold bar details
+        const goldBar = await db.query(
+            "SELECT id, clue_text, location_id FROM gold_bars WHERE id = $1",
+            [gold_bar_id]
+        );
+
+        if (!goldBar.rows.length) {
+            return res.status(404).json({ message: "Gold bar not found" });
+        }
+
+        // Check team exists
+        const team = await db.query("SELECT id, team_name FROM teams WHERE id = $1", [team_id]);
+        if (!team.rows.length) {
+            return res.status(404).json({ message: "Team not found" });
+        }
+
+        const bar = goldBar.rows[0];
+
+        // Assign the clue to the team
+        await db.query(`
+            INSERT INTO team_clues (team_id, current_clue_text, current_clue_location_id, next_gold_bar_id, updated_at)
+            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+            ON CONFLICT (team_id)
+            DO UPDATE SET
+                current_clue_text = $2,
+                current_clue_location_id = $3,
+                next_gold_bar_id = $4,
+                updated_at = CURRENT_TIMESTAMP
+        `, [team_id, bar.clue_text, bar.location_id, bar.id]);
+
+        // Notify the team via socket
+        const io = req.app.get("io");
+        io.to(`team_${team_id}`).emit("clue_assigned", {
+            clue_text: bar.clue_text,
+            message: "Admin has assigned you a new clue!"
+        });
+
+        res.json({
+            message: `Clue assigned to team '${team.rows[0].team_name}' successfully`,
+            clue_text: bar.clue_text
+        });
+    } catch (error) {
+        console.error("Assign clue error:", error);
+        res.status(500).json({ message: "Error assigning clue" });
+    }
+});
+
+// Get all teams (for clue assignment dropdown)
+router.get("/teams", async (req, res) => {
+    try {
+        const result = await db.query("SELECT id, team_name, team_type FROM teams ORDER BY team_name ASC");
+        res.json(result.rows);
+    } catch (error) {
+        console.error("Get teams error:", error);
+        res.status(500).json({ message: "Error fetching teams" });
+    }
+});
+
+// Update scan limit per team per round
+router.put("/scan-limit", async (req, res) => {
+    try {
+        const { scan_limit, team_id } = req.body;
+
+        if (scan_limit === undefined || scan_limit < 1) {
+            return res.status(400).json({ message: "scan_limit must be a positive number" });
+        }
+
+        // Lazy migration
+        try {
+            await db.query(`ALTER TABLE game_state ADD COLUMN IF NOT EXISTS scan_limit INTEGER DEFAULT 4`);
+        } catch(e) { /* ignore */ }
+
+        if (team_id) {
+            // Update for a specific team (if we support per-team limits via teams table)
+            // For now we store globally in game_state
+        }
+
+        await db.query(
+            "UPDATE game_state SET scan_limit = $1, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
+            [scan_limit]
+        );
+
+        res.json({ message: `Scan limit updated to ${scan_limit}`, scan_limit });
+    } catch (error) {
+        console.error("Update scan limit error:", error);
+        res.status(500).json({ message: "Error updating scan limit" });
+    }
+});
+
+// Update team location (called when team opens their app, for proximity feature)
+router.put("/teams/:id/location", async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { latitude, longitude } = req.body;
+
+        // Lazy migration
+        try {
+            await db.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS last_latitude DOUBLE PRECISION`);
+            await db.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS last_longitude DOUBLE PRECISION`);
+            await db.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMP`);
+        } catch(e) { /* ignore */ }
+
+        await db.query(
+            "UPDATE teams SET last_latitude = $1, last_longitude = $2, location_updated_at = CURRENT_TIMESTAMP WHERE id = $3",
+            [latitude, longitude, id]
+        );
+
+        res.json({ message: "Location updated" });
+    } catch (error) {
+        console.error("Update team location error:", error);
+        res.status(500).json({ message: "Error updating location" });
+    }
+});
+
 module.exports = router;
+

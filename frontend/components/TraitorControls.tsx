@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
     Box,
     Card,
@@ -13,7 +13,7 @@ import {
     Alert,
     LinearProgress
 } from "@mui/material";
-import { Dangerous, Timer, FlashOn } from "@mui/icons-material";
+import { Dangerous, Timer, FlashOn, LocationOn, FlashOff } from "@mui/icons-material";
 import { gameAPI } from "@/lib/api";
 import socket from "@/lib/socket";
 
@@ -26,6 +26,7 @@ interface InnocentTeam {
     team_name: string;
     total_score: number;
     is_sabotaged: boolean;
+    distance_km?: number;
 }
 
 export default function TraitorControls({ teamId }: TraitorControlsProps) {
@@ -34,12 +35,39 @@ export default function TraitorControls({ teamId }: TraitorControlsProps) {
     const [cooldown, setCooldown] = useState<{ remaining: number, total: number }>({ remaining: 0, total: 300 });
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+    const [sabotageEnabled, setSabotageEnabled] = useState(true);
+    const [locationShared, setLocationShared] = useState(false);
+
+    // Share location with backend for proximity-based innocent team ranking
+    const shareLocation = useCallback(() => {
+        if (!navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                try {
+                    await gameAPI.updateLocation({
+                        latitude: pos.coords.latitude,
+                        longitude: pos.coords.longitude,
+                    });
+                    setLocationShared(true);
+                } catch (err) {
+                    console.error("Location update failed:", err);
+                }
+            },
+            (err) => console.warn("Geolocation denied:", err),
+            { timeout: 5000 }
+        );
+    }, []);
 
     useEffect(() => {
         fetchData();
+        shareLocation(); // Share location on mount
+
         const interval = setInterval(updateCooldown, 1000);
         // Auto-refresh every 5s
-        const refreshInterval = setInterval(() => fetchData(true), 5000);
+        const refreshInterval = setInterval(() => {
+            fetchData(true);
+            shareLocation(); // Update location every 5s
+        }, 5000);
 
         socket.on("connect", () => {
             fetchData(true);
@@ -75,6 +103,11 @@ export default function TraitorControls({ teamId }: TraitorControlsProps) {
             }));
         });
 
+        // Listen for admin sabotage toggle
+        socket.on("sabotage_toggled", (data: { enabled: boolean }) => {
+            setSabotageEnabled(data.enabled);
+        });
+
         return () => {
             clearInterval(interval);
             clearInterval(refreshInterval);
@@ -82,6 +115,7 @@ export default function TraitorControls({ teamId }: TraitorControlsProps) {
             socket.off("sabotage_started_global");
             socket.off("sabotage_ended_global");
             socket.off("leaderboard_update");
+            socket.off("sabotage_toggled");
         };
     }, []);
 
@@ -127,8 +161,38 @@ export default function TraitorControls({ teamId }: TraitorControlsProps) {
         }
     };
 
+    const formatDistance = (km?: number) => {
+        if (!km || km === Infinity || !isFinite(km)) return null;
+        if (km < 1) return `${Math.round(km * 1000)}m away`;
+        return `${km.toFixed(2)}km away`;
+    };
+
     if (loading && innocentTeams.length === 0) {
         return <CircularProgress size={20} />;
+    }
+
+    // If sabotage feature is globally disabled
+    if (!sabotageEnabled) {
+        return (
+            <Card sx={{
+                mb: 3,
+                background: "linear-gradient(135deg, #1E293B 0%, #334155 100%)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: 3
+            }}>
+                <CardContent sx={{ p: 3 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                        <FlashOff sx={{ color: "#64748B", mr: 1 }} />
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: "#94A3B8" }}>
+                            Sabotage Disabled
+                        </Typography>
+                    </Box>
+                    <Alert severity="info">
+                        The sabotage feature has been disabled by the admin. You cannot sabotage any teams at this time.
+                    </Alert>
+                </CardContent>
+            </Card>
+        );
     }
 
     return (
@@ -139,11 +203,26 @@ export default function TraitorControls({ teamId }: TraitorControlsProps) {
             borderRadius: 3
         }}>
             <CardContent sx={{ p: 3 }}>
-                <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                    <Dangerous sx={{ color: "#EF4444", mr: 1 }} />
-                    <Typography variant="h6" sx={{ fontWeight: 700, color: "#FECACA" }}>
-                        Sabotage Controls
-                    </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                        <Dangerous sx={{ color: "#EF4444", mr: 1 }} />
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: "#FECACA" }}>
+                            Sabotage Controls
+                        </Typography>
+                    </Box>
+                    {locationShared && (
+                        <Chip
+                            icon={<LocationOn sx={{ fontSize: "0.85rem !important" }} />}
+                            label="Sorted by proximity"
+                            size="small"
+                            sx={{
+                                bgcolor: "rgba(16,185,129,0.15)",
+                                color: "#34D399",
+                                border: "1px solid rgba(16,185,129,0.3)",
+                                fontSize: "0.65rem",
+                            }}
+                        />
+                    )}
                 </Box>
 
                 {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -175,7 +254,7 @@ export default function TraitorControls({ teamId }: TraitorControlsProps) {
                 )}
 
                 <Typography variant="subtitle2" sx={{ mb: 2, color: "rgba(255,255,255,0.7)" }}>
-                    Available Targets (Innocents)
+                    {locationShared ? "Nearby Innocent Teams (sorted by proximity)" : "Available Targets (Innocents)"}
                 </Typography>
 
                 <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2 }}>
@@ -196,6 +275,11 @@ export default function TraitorControls({ teamId }: TraitorControlsProps) {
                                 <Typography variant="caption" color="rgba(255,255,255,0.5)">
                                     Score: {team.total_score}
                                 </Typography>
+                                {formatDistance(team.distance_km) && (
+                                    <Typography variant="caption" display="block" sx={{ color: "#34D399" }}>
+                                        <LocationOn sx={{ fontSize: "0.7rem" }} /> {formatDistance(team.distance_km)}
+                                    </Typography>
+                                )}
                             </Box>
                             <Button
                                 variant="contained"

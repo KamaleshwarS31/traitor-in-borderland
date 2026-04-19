@@ -48,6 +48,7 @@ import TeamsByType from "@/components/admin/TeamsByType";
 import SabotageMonitor from "@/components/admin/SabotageMonitor";
 import AnalyticsDashboard from "@/components/admin/AnalyticsDashboard";
 import PollControl from "@/components/admin/PollControl";
+import ClueAllocationManager from "@/components/admin/ClueAllocationManager";
 
 export default function AdminDashboard() {
     const router = useRouter();
@@ -168,7 +169,12 @@ export default function AdminDashboard() {
                         {currentTab === 7 && <ParticipantsManager />}
                         {currentTab === 8 && <TeamsManager />}
                         {currentTab === 9 && <AssignmentCardsGenerator />}
-                        {currentTab === 10 && <GameSettings />}
+                        {currentTab === 10 && (
+                            <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                                <GameSettings />
+                                <ClueAllocationManager />
+                            </Box>
+                        )}
                     </Box>
                 </Container>
             </Box>

@@ -118,12 +118,25 @@ export default function TraitorDashboard() {
             fetchData();
         });
 
+        // Admin manually assigned a clue to this team
+        socket.on("clue_assigned", (data: { clue_text: string; message: string }) => {
+            setCurrentClue(data.clue_text);
+            setSuccess(data.message);
+        });
+
+        // Admin enabled sabotage feature - show notification to traitors
+        socket.on("sabotage_enabled_notification", (data: { message: string }) => {
+            setSuccess(data.message);
+        });
+
         return () => {
             socket.off("round_started");
             socket.off("sabotaged");
             socket.off("sabotage_ended");
             socket.off("round_ended");
             socket.off("game_reset");
+            socket.off("clue_assigned");
+            socket.off("sabotage_enabled_notification");
         };
     }, [user]);
 

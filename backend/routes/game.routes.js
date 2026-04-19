@@ -113,6 +113,14 @@ router.post("/sabotage", verifyToken, async (req, res) => {
 
         const gameState = gameSettings.rows[0];
 
+        // Check if sabotage feature is enabled
+        const sabotageEnabledResult = await db.query(
+            "SELECT COALESCE(sabotage_enabled, TRUE) as sabotage_enabled FROM game_state WHERE id = 1"
+        );
+        if (sabotageEnabledResult.rows[0]?.sabotage_enabled === false) {
+            return res.status(403).json({ message: "Sabotage feature is currently disabled by admin." });
+        }
+
         // Restrict sabotage to only after 15 minutes of round start
         const roundStartTime = new Date(gameState.round_start_time);
         const now = new Date();
@@ -258,9 +266,21 @@ router.get("/innocent-teams", verifyToken, async (req, res) => {
             return res.status(403).json({ message: "Only traitors can view innocent teams" });
         }
 
-        // Get all innocent teams
+        // Get all innocent teams, sorted by proximity if traitor location is known
+        // First get the traitor's team location
+        const traitorTeamResult2 = await db.query(`
+            SELECT t.id, t.last_latitude, t.last_longitude
+            FROM teams t
+            INNER JOIN team_members tm ON t.id = tm.team_id
+            WHERE tm.user_id = $1
+        `, [userId]);
+
+        const traitorLat = traitorTeamResult2.rows[0]?.last_latitude;
+        const traitorLon = traitorTeamResult2.rows[0]?.last_longitude;
+
         const innocentTeams = await db.query(`
             SELECT t.id, t.team_name, t.total_score,
+                   t.last_latitude, t.last_longitude,
                    COUNT(DISTINCT tm.user_id) as member_count,
                    CASE 
                        WHEN EXISTS (
@@ -274,11 +294,31 @@ router.get("/innocent-teams", verifyToken, async (req, res) => {
             FROM teams t
             LEFT JOIN team_members tm ON t.id = tm.team_id
             WHERE LOWER(t.team_type) = 'innocent'
-            GROUP BY t.id, t.team_name, t.total_score
+            GROUP BY t.id, t.team_name, t.total_score, t.last_latitude, t.last_longitude
             ORDER BY t.team_name ASC
         `);
 
-        res.json(innocentTeams.rows);
+        let teams = innocentTeams.rows;
+
+        // If traitor location is known, add distance and sort by proximity
+        if (traitorLat && traitorLon) {
+            const toRad = (deg) => deg * Math.PI / 180;
+            const haversine = (lat1, lon1, lat2, lon2) => {
+                if (!lat2 || !lon2) return Infinity;
+                const R = 6371; // km
+                const dLat = toRad(lat2 - lat1);
+                const dLon = toRad(lon2 - lon1);
+                const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+                return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            };
+
+            teams = teams.map(team => ({
+                ...team,
+                distance_km: haversine(traitorLat, traitorLon, team.last_latitude, team.last_longitude)
+            })).sort((a, b) => (a.distance_km || Infinity) - (b.distance_km || Infinity));
+        }
+
+        res.json(teams);
     } catch (error) {
         console.error("Get innocent teams error:", error);
         res.status(500).json({ message: "Error fetching innocent teams" });
@@ -496,6 +536,47 @@ router.post("/poll/vote", verifyToken, async (req, res) => {
     } catch (error) {
         console.error("Cast vote error:", error);
         res.status(500).json({ message: "Error casting vote" });
+    }
+});
+
+// Update team location (for proximity-based innocent team display)
+router.post("/update-location", verifyToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { latitude, longitude } = req.body;
+
+        if (!latitude || !longitude) {
+            return res.status(400).json({ message: "latitude and longitude required" });
+        }
+
+        // Find user's team
+        const teamResult = await db.query(
+            "SELECT team_id FROM team_members WHERE user_id = $1",
+            [userId]
+        );
+
+        if (!teamResult.rows.length) {
+            return res.status(404).json({ message: "You are not in a team" });
+        }
+
+        const teamId = teamResult.rows[0].team_id;
+
+        // Lazy migration
+        try {
+            await db.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS last_latitude DOUBLE PRECISION`);
+            await db.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS last_longitude DOUBLE PRECISION`);
+            await db.query(`ALTER TABLE teams ADD COLUMN IF NOT EXISTS location_updated_at TIMESTAMP`);
+        } catch(e) { /* ignore */ }
+
+        await db.query(
+            "UPDATE teams SET last_latitude = $1, last_longitude = $2, location_updated_at = CURRENT_TIMESTAMP WHERE id = $3",
+            [latitude, longitude, teamId]
+        );
+
+        res.json({ message: "Location updated" });
+    } catch (error) {
+        console.error("Update location error:", error);
+        res.status(500).json({ message: "Error updating location" });
     }
 });
 
